@@ -69,6 +69,20 @@ Commands:
 - `map` to re-render the map with the player marker.
 - `quit` to exit.
 
+## Graphical viewer (pygame)
+
+Use `wiz6gfx` to render tiles, portraits, and monster records with pygame.
+
+```bash
+wiz6gfx path/to/map.w6mp --tiles-path path/to/tiles.w6tl --portraits-path portraits.w6pt
+```
+
+Install pygame via the optional dependency group:
+
+```bash
+python -m pip install ".[graphics]"
+```
+
 ## Supported data formats
 
 The loader supports the original Wizardry 6 containers with headers plus raw

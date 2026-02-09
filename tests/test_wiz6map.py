@@ -5,6 +5,7 @@ from pathlib import Path
 from wiz6map.data import GameDataLoadError, load_items, load_monsters, load_save_game
 from wiz6map.engine import GameDataBundle, GameEngine, PlayerState
 from wiz6map.loader import MapLoadError, MapGrid, MapTile, load_map, load_raw_map
+from wiz6map.pygame_viewer import _pixels_from_bytes
 from wiz6map.renderer import render_ascii
 from wiz6map.tiles import TileLoadError, load_tiles
 
@@ -142,6 +143,12 @@ class TestWizardryEngine(unittest.TestCase):
 
         self.assertFalse(engine.move("e"))
         self.assertTrue(engine.move("s"))
+
+
+class TestPygameViewerHelpers(unittest.TestCase):
+    def test_pixels_from_bytes_pads(self):
+        pixels = _pixels_from_bytes(bytes([1, 2, 3]), width=2, height=2)
+        self.assertEqual(pixels, ((1, 2), (3, 0)))
 
 
 if __name__ == "__main__":
