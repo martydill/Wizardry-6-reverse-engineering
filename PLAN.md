@@ -12,17 +12,14 @@ This is a **clean-room engine reimplementation** — no original code is used. T
 
 | Component | Technology | Rationale |
 |-----------|-----------|-----------|
-| Language | C++ 20 | Performance, low-level binary parsing, game engine ecosystem |
-| Build System | CMake 3.22+ | Cross-platform, widely supported |
-| Rendering | SDL3 + OpenGL 3.3 / Vulkan (optional) | Cross-platform, 2D/3D capable, modern SDL |
-| UI / Menus | Dear ImGui | Rapid iteration, debug tools, in-game UI overlays |
-| Audio | SDL3_mixer or OpenAL | PC speaker emulation + modern audio |
-| Image Loading | stb_image / stb_image_write | Header-only, lightweight |
-| Font Rendering | stb_truetype or SDL_ttf | Scalable fonts for modern resolutions |
-| Scripting | Lua 5.4 | Event scripting, moddability |
-| Serialization | Custom binary + JSON | Binary for original format compat, JSON for new saves |
-| Testing | Google Test | Unit + integration tests for parsers and game logic |
-| Package Manager | vcpkg or Conan | Dependency management |
+| Language | Python 3.11+ | Rapid development, excellent binary parsing (struct), rich ecosystem |
+| Build System | pyproject.toml + pip | Standard Python packaging |
+| Rendering | pygame-ce (SDL2) | Cross-platform 2D/3D, active community fork |
+| Image Processing | Pillow (PIL) | Sprite extraction, format conversion |
+| Serialization | struct (binary) + json | Binary for original format compat, JSON for new saves |
+| Testing | pytest | Unit + integration tests for parsers and game logic |
+| Linting | ruff + mypy | Fast linting and static type checking |
+| Scripting | Lua via lupa (future) | Event scripting, moddability |
 
 ---
 
@@ -62,81 +59,51 @@ This is a **clean-room engine reimplementation** — no original code is used. T
 ```
 Bane/
 ├── PLAN.md                   # This document
-├── CMakeLists.txt            # Root build configuration
-├── src/
-│   ├── main.cpp              # Entry point
-│   ├── engine/               # Core engine systems
-│   │   ├── Engine.h/cpp      # Main engine class, game loop
-│   │   ├── Window.h/cpp      # SDL window management
-│   │   ├── Renderer.h/cpp    # 2D/3D rendering abstraction
-│   │   ├── Input.h/cpp       # Input handling & key mapping
-│   │   ├── Audio.h/cpp       # Sound & music playback
-│   │   ├── EventBus.h/cpp    # Publish/subscribe event system
-│   │   ├── StateMachine.h/cpp# Game state management
-│   │   └── ResourceManager.h/cpp # Asset caching & lifetime
+├── pyproject.toml            # Python project configuration
+├── .gitignore
+├── bane/                     # Main Python package
+│   ├── __init__.py
+│   ├── __main__.py           # Entry point (python -m bane)
 │   ├── data/                 # Original data file parsers
-│   │   ├── DBSParser.h/cpp           # SCENARIO.DBS master parser
-│   │   ├── ScenarioHeader.h/cpp      # SCENARIO.HDR parser
-│   │   ├── MonsterData.h/cpp         # Monster definitions
-│   │   ├── ItemData.h/cpp            # Item definitions
-│   │   ├── SpellData.h/cpp           # Spell definitions
-│   │   ├── LootTableData.h/cpp       # Loot/drop tables
-│   │   ├── MapData.h/cpp             # Map/maze binary data
-│   │   ├── CharacterData.h/cpp       # PCFILE.DBS character parser
-│   │   ├── SaveGameData.h/cpp        # SAVEGAME.DBS parser
-│   │   ├── SpriteData.h/cpp          # EGA sprite decoder
-│   │   ├── PaletteData.h/cpp         # EGA palette handling
-│   │   ├── ClassRaceData.h/cpp       # Class/race stat tables
-│   │   └── EventData.h/cpp           # Map event/trigger data
+│   │   ├── binary_reader.py          # BinaryReader/Writer utilities
+│   │   ├── enums.py                  # All game enumerations
+│   │   ├── models.py                 # Dataclass models for all entities
+│   │   ├── scenario_parser.py        # SCENARIO.DBS master parser
+│   │   ├── character_parser.py       # PCFILE.DBS character parser
+│   │   ├── savegame_parser.py        # SAVEGAME.DBS save file parser
+│   │   ├── sprite_decoder.py         # EGA sprite decoder + palette
+│   │   └── map_loader.py             # Map/maze loader + DungeonMap
+│   ├── engine/               # Core engine systems
+│   │   ├── config.py                 # EngineConfig
+│   │   ├── engine.py                 # Main engine class + game loop
+│   │   ├── renderer.py               # 2D/3D rendering (pygame)
+│   │   ├── event_bus.py              # Publish/subscribe events
+│   │   ├── state_machine.py          # Game state stack
+│   │   └── resource_manager.py       # Asset caching & loading
 │   ├── game/                 # Game logic & mechanics
-│   │   ├── Party.h/cpp               # Party management (6 chars)
-│   │   ├── Character.h/cpp           # Character model & stats
-│   │   ├── Combat.h/cpp              # Turn-based combat engine
-│   │   ├── CombatCalculations.h/cpp  # Damage, hit, crit formulas
-│   │   ├── MagicSystem.h/cpp         # Spell casting & effects
-│   │   ├── SkillSystem.h/cpp         # Skill checks & progression
-│   │   ├── Inventory.h/cpp           # Item management & equipment
-│   │   ├── ClassSystem.h/cpp         # Class change & progression
-│   │   ├── LevelUp.h/cpp             # Level up & stat allocation
-│   │   ├── Encounter.h/cpp           # Random & fixed encounters
-│   │   ├── NPCInteraction.h/cpp      # NPC dialogue & events
-│   │   └── QuestSystem.h/cpp         # Quest flags & progression
-│   ├── world/                # World/dungeon systems
-│   │   ├── Dungeon.h/cpp             # Dungeon level management
-│   │   ├── Tile.h/cpp                # Tile data (walls, doors, etc.)
-│   │   ├── DungeonRenderer.h/cpp     # First-person maze rendering
-│   │   ├── Automap.h/cpp             # Automap system
-│   │   ├── Navigation.h/cpp          # Movement & collision
-│   │   └── TriggerSystem.h/cpp       # Tile-based event triggers
+│   │   ├── character.py              # Character creation, leveling, class change
+│   │   ├── party.py                  # Party management (6 members)
+│   │   ├── combat.py                 # Turn-based combat engine
+│   │   ├── magic.py                  # Spell casting & effects
+│   │   └── inventory.py              # Items, equipment, merchants
+│   ├── world/                # World/dungeon systems (future)
 │   └── ui/                   # User interface
-│       ├── GameScreen.h/cpp          # Main gameplay HUD
-│       ├── CombatScreen.h/cpp        # Combat UI
-│       ├── CharacterSheet.h/cpp      # Character stats/inventory
-│       ├── SpellBook.h/cpp           # Spell selection UI
-│       ├── CreateCharacter.h/cpp     # Character creation flow
-│       ├── MainMenu.h/cpp            # Title screen & menu
-│       ├── DialogueBox.h/cpp         # NPC dialogue display
-│       ├── MerchantScreen.h/cpp      # Shop/trade UI
-│       └── OptionsScreen.h/cpp       # Settings & configuration
-├── include/                  # Public headers (if needed)
-├── assets/                   # Engine-provided assets (fonts, shaders)
-│   ├── shaders/
-│   └── fonts/
+│       ├── main_menu.py              # Title screen & menu
+│       └── exploration.py            # First-person dungeon exploration
 ├── tools/                    # Standalone data inspection tools
-│   ├── dbs_dumper.cpp        # Dump DBS file contents
-│   ├── sprite_viewer.cpp     # View extracted sprites
-│   └── map_viewer.cpp        # Visualize map data
-├── tests/                    # Unit & integration tests
-│   ├── test_dbs_parser.cpp
-│   ├── test_character.cpp
-│   ├── test_combat.cpp
-│   ├── test_map_loader.cpp
-│   └── test_sprite_decoder.cpp
+│   ├── dbs_dumper.py         # Dump DBS file contents
+│   ├── sprite_viewer.py     # View extracted sprites
+│   └── map_viewer.py        # Visualize map data
+├── tests/                    # pytest test suite (100 tests)
+│   ├── test_binary_reader.py
+│   ├── test_enums.py
+│   ├── test_character.py
+│   ├── test_combat.py
+│   ├── test_map_loader.py
+│   └── test_sprite_decoder.py
+├── assets/                   # Engine-provided assets
 ├── docs/                     # Reverse engineering documentation
-│   ├── file_formats.md       # Documented binary formats
-│   ├── combat_formulas.md    # Reverse-engineered combat math
-│   └── map_format.md         # Map/maze data format
-└── third_party/              # Vendored dependencies (if any)
+└── mods/                     # User mod directory
 ```
 
 ---
@@ -146,16 +113,16 @@ Bane/
 **Goal:** Parse every original Wizardry 6 data file and expose structured data.
 
 ### 1.1 Project Scaffolding
-- [ ] Initialize CMake build system with C++20
-- [ ] Set up dependency management (SDL3, ImGui, Google Test)
-- [ ] Create directory structure
+- [x] Initialize Python project with pyproject.toml
+- [x] Set up dependency management (pygame-ce, Pillow, pytest, ruff, mypy)
+- [x] Create directory structure
 - [ ] Configure CI (GitHub Actions: build + test on Linux/macOS/Windows)
-- [ ] Set up clang-format / clang-tidy
+- [ ] Set up ruff / mypy linting
 
 ### 1.2 Binary File Infrastructure
-- [ ] Implement `BinaryReader` utility class (little-endian reads, seek, bounds checking)
-- [ ] Implement `BinaryWriter` for save game output
-- [ ] Create hex dump / inspection tool (`tools/dbs_dumper`)
+- [x] Implement `BinaryReader` utility class (little-endian reads, seek, bounds checking)
+- [x] Implement `BinaryWriter` for save game output
+- [x] Create hex dump / inspection tool (`tools/dbs_dumper`)
 
 ### 1.3 SCENARIO.DBS Parser
 This is the most critical and complex file — it contains the entire game world.

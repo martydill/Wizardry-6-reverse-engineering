@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bane-engine"
+version = "0.1.0"
+description = "Modern game engine remake of Wizardry VI: Bane of the Cosmic Forge"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+keywords = ["wizardry", "game-engine", "rpg", "retro"]
+
+dependencies = [
+    "pygame-ce>=2.4.0",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5",
+]
+
+[project.scripts]
+bane = "bane.__main__:main"
+bane-dump = "tools.dbs_dumper:main"
+bane-sprites = "tools.sprite_viewer:main"
+bane-map = "tools.map_viewer:main"
+
+[tool.setuptools.packages.find]
+include = ["bane*", "tools*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

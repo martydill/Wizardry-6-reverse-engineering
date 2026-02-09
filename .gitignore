@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+.env
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# Game data files (users must provide their own)
+gamedata/
+*.DBS
+*.HDR
+*.BCF
+*.EXE
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
