@@ -2,10 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from wiz6map.combat import CombatState, Monster, PartyMember
 from wiz6map.data import GameDataLoadError, load_items, load_monsters, load_save_game
 from wiz6map.engine import GameDataBundle, GameEngine, PlayerState
 from wiz6map.loader import MapLoadError, MapGrid, MapTile, load_map, load_raw_map
-from wiz6map.pygame_viewer import _pixels_from_bytes
+from wiz6map.pygame_viewer import _pixels_from_bytes, _split_monster_frames
 from wiz6map.renderer import render_ascii
 from wiz6map.tiles import TileLoadError, load_tiles
 
@@ -149,6 +150,24 @@ class TestPygameViewerHelpers(unittest.TestCase):
     def test_pixels_from_bytes_pads(self):
         pixels = _pixels_from_bytes(bytes([1, 2, 3]), width=2, height=2)
         self.assertEqual(pixels, ((1, 2), (3, 0)))
+
+    def test_split_monster_frames(self):
+        payload = bytes([1, 2, 3, 4, 5, 6, 7, 8])
+        first, second = _split_monster_frames(payload, width=2, height=2)
+        self.assertEqual(first, ((1, 2), (3, 4)))
+        self.assertEqual(second, ((5, 6), (7, 8)))
+
+
+class TestCombatState(unittest.TestCase):
+    def test_combat_resolves_turns(self):
+        party = [PartyMember(name="Hero", hp=10, attack=6, defense=1)]
+        monsters = [Monster(name="Rat", hp=4, attack=2, defense=0)]
+        state = CombatState(party=party, monsters=monsters)
+
+        result = state.perform_attack()
+        self.assertIsNotNone(result)
+        self.assertEqual(monsters[0].hp, 0)
+        self.assertEqual(state.victors, "party")
 
 
 if __name__ == "__main__":

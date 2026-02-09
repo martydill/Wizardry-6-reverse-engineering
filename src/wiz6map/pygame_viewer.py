@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .combat import CombatState, Monster, PartyMember
 from .data import PortraitSet, RecordData
 from .engine import GameEngine, PlayerState, load_game_data_bundle
 from .tiles import TileSet
@@ -18,6 +19,9 @@ class RenderConfig:
     background: tuple[int, int, int] = (16, 16, 24)
     grid_color: tuple[int, int, int] = (40, 40, 56)
     player_color: tuple[int, int, int] = (255, 215, 0)
+    combat_panel: tuple[int, int, int] = (24, 24, 36)
+    combat_border: tuple[int, int, int] = (90, 90, 110)
+    combat_text: tuple[int, int, int] = (230, 230, 230)
 
 
 def run_pygame_viewer(
@@ -88,6 +92,9 @@ def run_pygame_viewer(
     screen = pygame.display.set_mode(window_size)
 
     clock = pygame.time.Clock()
+    combat_state = _build_combat_state(data.portraits, data.monsters)
+    combat_mode = False
+    last_combat_tick = 0
     running = True
     while running:
         for event in pygame.event.get():
@@ -96,6 +103,8 @@ def run_pygame_viewer(
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                if event.key == pygame.K_c:
+                    combat_mode = not combat_mode
                 if event.key == pygame.K_UP:
                     engine.move("n")
                 if event.key == pygame.K_DOWN:
@@ -106,9 +115,16 @@ def run_pygame_viewer(
                     engine.move("e")
 
         screen.fill(config.background)
-        _draw_grid(screen, engine, data.tiles, config)
-        _draw_portraits(screen, data.portraits, grid_width, config)
-        _draw_monsters(screen, data.monsters, grid_width, 220, config)
+        if combat_mode:
+            now = pygame.time.get_ticks()
+            if now - last_combat_tick > 1000 and combat_state and not combat_state.over:
+                combat_state.perform_attack()
+                last_combat_tick = now
+            _draw_combat(screen, combat_state, data.portraits, data.monsters, config)
+        else:
+            _draw_grid(screen, engine, data.tiles, config)
+            _draw_portraits(screen, data.portraits, grid_width, config)
+            _draw_monsters(screen, data.monsters, grid_width, 220, config)
 
         pygame.display.flip()
         clock.tick(30)
@@ -205,6 +221,18 @@ def _pixels_from_bytes(
     return tuple(rows)
 
 
+def _split_monster_frames(
+    payload: bytes, width: int, height: int
+) -> tuple[tuple[tuple[int, ...], ...], tuple[tuple[int, ...], ...]]:
+    frame_size = width * height
+    if frame_size == 0:
+        empty = tuple()
+        return empty, empty
+    first = _pixels_from_bytes(payload[:frame_size], width, height)
+    second = _pixels_from_bytes(payload[frame_size : frame_size * 2], width, height)
+    return first, second
+
+
 def _blit_pixels(screen, pixels, x: int, y: int, scale: int) -> None:
     import pygame
 
@@ -216,3 +244,118 @@ def _blit_pixels(screen, pixels, x: int, y: int, scale: int) -> None:
                 x + col_index * scale, y + row_index * scale, scale, scale
             )
             screen.fill(color, rect)
+
+
+def _build_combat_state(
+    portraits: PortraitSet | None, monsters: RecordData | None
+) -> CombatState | None:
+    if portraits is None or monsters is None:
+        return None
+
+    party = []
+    for index in range(min(6, len(portraits.portraits))):
+        party.append(PartyMember(name=f"Hero {index + 1}", hp=20, attack=6, defense=2))
+
+    monster_list = []
+    for index in range(min(3, len(monsters.records))):
+        monster_list.append(
+            Monster(
+                name=f"Rat {index + 1}",
+                hp=12,
+                attack=4,
+                defense=1,
+                sprite_index=index,
+            )
+        )
+    if not party or not monster_list:
+        return None
+    return CombatState(party=party, monsters=monster_list)
+
+
+def _draw_combat(
+    screen,
+    combat_state: CombatState | None,
+    portraits: PortraitSet | None,
+    monsters: RecordData | None,
+    config: RenderConfig,
+) -> None:
+    import pygame
+
+    width, height = screen.get_size()
+    panel = pygame.Rect(20, 20, width - 40, height - 40)
+    pygame.draw.rect(screen, config.combat_panel, panel)
+    pygame.draw.rect(screen, config.combat_border, panel, 2)
+
+    font = pygame.font.Font(None, 24)
+    title = font.render("Combat", True, config.combat_text)
+    screen.blit(title, (panel.x + 10, panel.y + 10))
+
+    if combat_state is None or portraits is None or monsters is None:
+        notice = font.render(
+            "Missing portraits or monsters data.", True, config.combat_text
+        )
+        screen.blit(notice, (panel.x + 10, panel.y + 40))
+        return
+
+    _draw_party_panel(screen, combat_state, portraits, panel, config)
+    _draw_monster_panel(screen, combat_state, monsters, panel, config)
+
+    status = combat_state.victors
+    if status:
+        message = f"{status.title()} win!"
+    else:
+        message = "Press C to exit combat."
+    status_text = font.render(message, True, config.combat_text)
+    screen.blit(status_text, (panel.x + 10, panel.bottom - 30))
+
+
+def _draw_party_panel(
+    screen,
+    combat_state: CombatState,
+    portraits: PortraitSet,
+    panel,
+    config: RenderConfig,
+) -> None:
+    import pygame
+
+    x = panel.x + 20
+    y = panel.y + 50
+    font = pygame.font.Font(None, 20)
+
+    for index, member in enumerate(combat_state.party):
+        portrait = portraits.portraits[index % len(portraits.portraits)]
+        pixels = _pixels_from_bytes(portrait, portraits.width, portraits.height)
+        _blit_pixels(screen, pixels, x, y, config.portrait_scale)
+        label = font.render(f"{member.name} HP {member.hp}", True, config.combat_text)
+        screen.blit(label, (x + portraits.width * config.portrait_scale + 10, y + 5))
+        y += portraits.height * config.portrait_scale + 12
+
+
+def _draw_monster_panel(
+    screen,
+    combat_state: CombatState,
+    monsters: RecordData,
+    panel,
+    config: RenderConfig,
+) -> None:
+    import pygame
+
+    font = pygame.font.Font(None, 20)
+    base_x = panel.centerx + 20
+    base_y = panel.y + 80
+    now = pygame.time.get_ticks()
+    frame_index = 1 if (now // 250) % 2 else 0
+
+    for index, monster in enumerate(combat_state.monsters):
+        record = monsters.records[monster.sprite_index % len(monsters.records)]
+        first, second = _split_monster_frames(
+            record, config.monster_width, config.monster_height
+        )
+        pixels = second if frame_index else first
+        _blit_pixels(screen, pixels, base_x, base_y, config.monster_scale)
+        label = font.render(f"{monster.name} HP {monster.hp}", True, config.combat_text)
+        screen.blit(
+            label,
+            (base_x, base_y + config.monster_height * config.monster_scale + 4),
+        )
+        base_x += config.monster_width * config.monster_scale + 30

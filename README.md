@@ -71,7 +71,8 @@ Commands:
 
 ## Graphical viewer (pygame)
 
-Use `wiz6gfx` to render tiles, portraits, and monster records with pygame.
+Use `wiz6gfx` to render tiles, portraits, and monster records with pygame. Press
+`C` to toggle a combat view inspired by the original Wizardry 6 layout.
 
 ```bash
 wiz6gfx path/to/map.w6mp --tiles-path path/to/tiles.w6tl --portraits-path portraits.w6pt
