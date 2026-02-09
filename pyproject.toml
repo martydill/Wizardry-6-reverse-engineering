@@ -11,6 +11,7 @@ authors = [
 
 [project.scripts]
 wiz6map = "wiz6map.cli:main"
+wiz6game = "wiz6map.game_cli:main"
 
 [project.optional-dependencies]
 dev = [

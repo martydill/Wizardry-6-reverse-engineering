@@ -1,6 +1,8 @@
 # Wizardry 6 ASCII Map Viewer
 
-This tool loads Wizardry 6 map data and renders an ASCII representation.
+This tool loads Wizardry 6 data and renders an ASCII representation of maps. It
+also includes a lightweight ASCII game loop that ties together maps, tiles, and
+the core data files used by Wizardry 6.
 
 ## Supported map formats
 
@@ -51,3 +53,31 @@ wiz6map path/to/raw.map --format raw --width 30 --height 30
 
 The ASCII output uses `+`, `-`, and `|` for walls and a centered marker for
 doors (`D`), secrets (`S`), and stairs (`^`/`v`).
+
+## ASCII game loop
+
+Use `wiz6game` to load Wizardry 6 data files and move a player around the map
+with a basic text interface.
+
+```bash
+wiz6game path/to/map.w6mp --tiles-path path/to/tiles.w6tl
+```
+
+Commands:
+
+- `n`, `s`, `e`, `w` to move.
+- `map` to re-render the map with the player marker.
+- `quit` to exit.
+
+## Supported data formats
+
+The loader supports the original Wizardry 6 containers with headers plus raw
+payloads for validation or tooling:
+
+- **Monsters:** `W6MO` header + record size/count + payload.
+- **Items:** `W6IT` header + record size/count + payload.
+- **NPCs:** `W6NP` header + record size/count + payload.
+- **Conversations:** `W6CV` header + record size/count + payload.
+- **Game data blob:** `W6GD` header + payload.
+- **Save games:** `W6SV` header + payload.
+- **Portraits:** `W6PT` header + width/height/count + payload.
