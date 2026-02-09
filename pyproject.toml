@@ -1,0 +1,26 @@
+[project]
+name = "wiz6map"
+version = "0.1.0"
+description = "Load Wizardry 6 map data and render ASCII maps."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+  {name = "Wizardry Mapper"},
+]
+
+[project.scripts]
+wiz6map = "wiz6map.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "ruff==0.6.8",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
