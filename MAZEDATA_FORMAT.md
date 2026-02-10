@@ -5,40 +5,42 @@ MAZEDATA.EGA contains all wall, floor, and ceiling textures for Wizardry 6's dun
 
 ## File Format
 - **Type**: EGA texture atlas image
-- **Dimensions**: 320×200 pixels
-- **Color**: 16 colors (EGA palette)
-- **Storage**: Row-interleaved planar format
-- **Size**: 102,303 bytes total (32,000 bytes of image data + additional data)
+- **Dimensions**: 320×200 pixels (first image)
+- **Color**: 16 colors (default EGA palette)
+- **Storage**: Sequential planar format
+- **Size**: 102,303 bytes total (32,000 bytes main atlas + 70,303 bytes additional data)
 
 ## Structure
 
 ### Image Data (bytes 0-31,999)
-The first 32,000 bytes contain a 320×200 EGA image in row-interleaved planar format:
+The first 32,000 bytes contain a 320×200 EGA image in **sequential planar format**:
 
 ```
-Each scanline consists of 4 planes:
-- Plane 0: 40 bytes (320 pixels / 8 bits)
-- Plane 1: 40 bytes
-- Plane 2: 40 bytes
-- Plane 3: 40 bytes
-Total: 160 bytes per scanline × 200 scanlines = 32,000 bytes
+Sequential planar layout:
+- Plane 0 (bit 0): 8,000 bytes (320×200/8)
+- Plane 1 (bit 1): 8,000 bytes
+- Plane 2 (bit 2): 8,000 bytes
+- Plane 3 (bit 3): 8,000 bytes
+Total: 32,000 bytes
+
+Each plane stores all pixels for that bit position before moving to the next plane.
 ```
 
-### Additional Data (bytes 32,000+)
-The remaining ~70KB contains additional textures or animation frames (TBD - needs further analysis).
+### Additional Data (bytes 32,000-102,302)
+The remaining 70,303 bytes likely contains additional textures, animation frames, or alternate texture sets.
+
+## Important: No Palette Header!
+Unlike other .EGA files (TITLEPAG.EGA, DRAGONSC.EGA, GRAVEYRD.EGA), **MAZEDATA.EGA has NO 768-byte palette header**. It uses the default 16-color EGA palette.
 
 ## Image Content
-The 320×200 texture atlas contains:
-- **Stone/brick wall textures** in various styles (top rows)
+The 320×200 texture atlas shows horizontal rows of textures:
+- **Stone/brick wall textures** in various styles
 - **Floor textures**
 - **Ceiling textures**
 - **Door textures**
-- **Special effects** (darkness, magical barriers, etc.)
+- **Special wall types** (darkness, magical barriers, etc.)
 
-Textures appear to be arranged in:
-- 8×8 pixel tiles
-- 16×16 pixel tiles
-- Possibly larger composite textures
+Textures appear to be arranged as horizontal bands in the atlas.
 
 ## Decoding
 
@@ -51,17 +53,47 @@ from PIL import Image
 with open("MAZEDATA.EGA", "rb") as f:
     data = f.read()
 
-# Decode first 32KB as 320x200 EGA image
+# IMPORTANT: Use DEFAULT_16_PALETTE (no palette header in this file!)
 decoder = EGADecoder(palette=DEFAULT_16_PALETTE)
-atlas = decoder.decode_planar_row_interleaved(
+
+# Decode using SEQUENTIAL planar format (not row-interleaved!)
+atlas = decoder.decode_planar(
     data[:32000],
     width=320,
-    height=200
+    height=200,
+    msb_first=True
 )
 
 # Save as PNG
 img = Image.frombytes("RGB", (atlas.width, atlas.height), atlas.to_rgb_bytes())
 img.save("mazedata_atlas.png")
+```
+
+### Decoding Other .EGA Files (TITLEPAG, DRAGONSC, GRAVEYRD)
+These files HAVE a 768-byte palette header:
+
+```python
+# Read file
+with open("TITLEPAG.EGA", "rb") as f:
+    data = f.read()
+
+# Extract palette from first 768 bytes (VGA palette format, 0-63 range)
+palette = []
+for i in range(16):
+    r = min(255, data[i * 3] * 4)
+    g = min(255, data[i * 3 + 1] * 4)
+    b = min(255, data[i * 3 + 2] * 4)
+    palette.append((r, g, b))
+
+decoder = EGADecoder(palette=palette)
+
+# Decode from byte 768 onward
+atlas = decoder.decode_planar(
+    data[768:],
+    width=320,
+    height=200,
+    msb_first=True
+)
 ```
 
 ### Extracting Individual Textures
@@ -71,7 +103,7 @@ To extract a specific texture from the atlas:
 3. Copy the pixel region from the decoded atlas image
 
 ```python
-# Extract 32×32 texture at position (x=0, y=0)
+# Extract a texture at position (x, y) with size (w, h)
 def extract_texture(atlas, x, y, w, h):
     pixels = []
     for row in range(h):
@@ -84,22 +116,25 @@ def extract_texture(atlas, x, y, w, h):
 ## Usage in Game Engine
 The game engine should:
 1. Load MAZEDATA.EGA once at startup
-2. Decode it into a 320×200 texture atlas
-3. Pre-extract commonly used textures (walls, floors, ceilings) into individual sprites
-4. Store texture coordinates or IDs for each dungeon tile type
+2. Decode it into a 320×200 texture atlas using sequential planar format
+3. Pre-extract commonly used textures into individual sprites
+4. Map texture IDs to coordinates within the atlas
 5. Render dungeon walls by blitting the appropriate texture
 
-## Comparison to Other Files
-- **TITLEPAG.EGA**: 32,768 bytes = exact 320×200 EGA image
-- **DRAGONSC.EGA**: 32,768 bytes = exact 320×200 EGA image
-- **GRAVEYRD.EGA**: 32,768 bytes = exact 320×200 EGA image
-- **MAZEDATA.EGA**: 102,303 bytes = 320×200 atlas + 70KB additional data
+## File Format Comparison
 
-All use the same row-interleaved planar EGA format.
+| File | Size | Palette Header | Format |
+|------|------|----------------|--------|
+| TITLEPAG.EGA | 32,768 | ✓ (768 bytes) | Sequential planar |
+| DRAGONSC.EGA | 32,768 | ✓ (768 bytes) | Sequential planar |
+| GRAVEYRD.EGA | 32,768 | ✓ (768 bytes) | Sequential planar |
+| **MAZEDATA.EGA** | 102,303 | ✗ (no header) | Sequential planar |
+
+All use 320×200 resolution with 4-bit sequential planar encoding.
 
 ## Next Steps
-1. ✅ Decode primary 320×200 texture atlas
-2. ⏳ Map out which textures are located where in the atlas
+1. ✅ Decode primary 320×200 texture atlas using correct sequential planar format
+2. ⏳ Map texture coordinates for each dungeon tile type
 3. ⏳ Analyze the remaining 70KB of data
-4. ⏳ Determine how the game references textures (by coordinates? by ID?)
+4. ⏳ Determine texture ID → coordinate mapping
 5. ⏳ Extract and catalog all wall/floor/ceiling textures

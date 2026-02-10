@@ -156,11 +156,20 @@ class EGADecoder:
     - Plane 0: bit 0 of each pixel's color index
     - Plane 1: bit 1
     - Plane 2: bit 2
-    - Plane 3: bit 3 (intensity)
+    - Plane 3: bit 3
 
-    Each plane stores 1 bit per pixel, packed 8 pixels per byte.
+    Each plane stores 1 bit per pixel, packed 8 pixels per byte (MSB first).
     For a 320x200 image, each plane is 320*200/8 = 8000 bytes.
     Total: 4 * 8000 = 32000 bytes.
+
+    Wizardry 6 uses two planar storage formats:
+    1. Sequential planar (MAZEDATA.EGA, TITLEPAG.EGA): Each plane stored completely
+       before the next (plane0, plane1, plane2, plane3)
+    2. Row-interleaved planar (some .PIC files): Planes interleaved per scanline
+       (plane0_row0, plane1_row0, plane2_row0, plane3_row0, plane0_row1, ...)
+
+    Many .EGA files have a 768-byte VGA palette header before the image data.
+    MAZEDATA.EGA has NO palette header - use DEFAULT_16_PALETTE.
     """
 
     def __init__(self, palette: list[tuple[int, int, int]] | None = None) -> None:
@@ -175,13 +184,21 @@ class EGADecoder:
         msb_first: bool = True,
         plane_order: list[int] | None = None,
     ) -> Sprite:
-        """Decode interleaved planar EGA data into a Sprite.
+        """Decode sequential planar EGA data into a Sprite.
+
+        Sequential planar format stores each complete plane consecutively:
+        - Plane 0: all bytes for this plane
+        - Plane 1: all bytes for this plane
+        - Plane 2: all bytes for this plane
+        - Plane 3: all bytes for this plane
 
         Args:
             data: Raw planar byte data
             width: Image width in pixels (must be multiple of 8)
             height: Image height in pixels
             planes: Number of bit planes (typically 4 for EGA)
+            msb_first: If True, MSB is leftmost pixel in each byte (default for EGA)
+            plane_order: Optional custom plane ordering (default [0,1,2,3])
         """
         if width % 8 != 0:
             raise ValueError(f"Width must be multiple of 8, got {width}")
