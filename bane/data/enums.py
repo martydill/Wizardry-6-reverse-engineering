@@ -170,6 +170,9 @@ class ItemType(IntEnum):
     QUEST = 12
     AMMO = 13
     INSTRUMENT = 14
+    POWDER = 15
+    BOOK = 16
+    FOOD = 17
 
 
 # ---------------------------------------------------------------------------

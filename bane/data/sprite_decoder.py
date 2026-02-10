@@ -161,7 +161,13 @@ class EGADecoder:
         self.palette = palette or list(DEFAULT_16_PALETTE)
 
     def decode_planar(
-        self, data: bytes, width: int, height: int, planes: int = 4
+        self,
+        data: bytes,
+        width: int,
+        height: int,
+        planes: int = 4,
+        msb_first: bool = True,
+        plane_order: list[int] | None = None,
     ) -> Sprite:
         """Decode interleaved planar EGA data into a Sprite.
 
@@ -189,14 +195,79 @@ class EGADecoder:
 
         pixels: list[int] = [0] * (width * height)
 
-        for plane in range(planes):
-            plane_offset = plane * plane_size
+        order = plane_order or list(range(planes))
+        if len(order) != planes:
+            raise ValueError("plane_order must match number of planes")
+
+        for plane_index, plane in enumerate(order):
+            plane_offset = plane_index * plane_size
             for y in range(height):
                 row_offset = plane_offset + y * bytes_per_row
                 for byte_idx in range(bytes_per_row):
                     byte_val = data[row_offset + byte_idx]
                     for bit in range(8):
-                        x = byte_idx * 8 + (7 - bit)  # MSB first
+                        if msb_first:
+                            x = byte_idx * 8 + (7 - bit)
+                        else:
+                            x = byte_idx * 8 + bit
+                        pixel_idx = y * width + x
+                        if byte_val & (1 << bit):
+                            pixels[pixel_idx] |= 1 << plane
+
+        return Sprite(
+            width=width,
+            height=height,
+            pixels=pixels,
+            palette=list(self.palette),
+        )
+
+    def decode_planar_row_interleaved(
+        self,
+        data: bytes,
+        width: int,
+        height: int,
+        planes: int = 4,
+        msb_first: bool = True,
+        plane_order: list[int] | None = None,
+    ) -> Sprite:
+        """Decode EGA planar data where planes are interleaved per scanline.
+
+        Layout per row:
+            plane0_row, plane1_row, plane2_row, plane3_row
+        Each row segment is width/8 bytes per plane.
+        """
+        if width % 8 != 0:
+            raise ValueError(f"Width must be multiple of 8, got {width}")
+
+        bytes_per_row = width // 8
+        row_size = bytes_per_row * planes
+        expected_size = row_size * height
+
+        if len(data) < expected_size:
+            logger.warning(
+                "Planar row data too short: expected %d bytes, got %d",
+                expected_size,
+                len(data),
+            )
+            data = data + b"\x00" * (expected_size - len(data))
+
+        pixels: list[int] = [0] * (width * height)
+
+        order = plane_order or list(range(planes))
+        if len(order) != planes:
+            raise ValueError("plane_order must match number of planes")
+
+        for y in range(height):
+            row_base = y * row_size
+            for plane_index, plane in enumerate(order):
+                plane_offset = row_base + plane_index * bytes_per_row
+                for byte_idx in range(bytes_per_row):
+                    byte_val = data[plane_offset + byte_idx]
+                    for bit in range(8):
+                        if msb_first:
+                            x = byte_idx * 8 + (7 - bit)
+                        else:
+                            x = byte_idx * 8 + bit
                         pixel_idx = y * width + x
                         if byte_val & (1 << bit):
                             pixels[pixel_idx] |= 1 << plane

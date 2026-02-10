@@ -35,9 +35,23 @@ class MonsterDef:
 
     id: int = 0
     name: str = ""
-    level: int = 0
+    plural_name: str = ""
+    short_name: str = ""
+    short_plural_name: str = ""
+    strength: int = 0
+    intelligence: int = 0
+    dexterity: int = 0
+    speed: int = 0
     hp_min: int = 0
     hp_max: int = 0
+    stamina_min: int = 0
+    stamina_max: int = 0
+    group_size_min: int = 1
+    group_size_max: int = 1
+    evasion: int = 0
+    level: int = 0
+    ac_min: int = 0
+    ac_max: int = 0
     ac: dict[AttackMode, int] = field(default_factory=dict)  # 9 attack mode ACs
     xp_reward: int = 0
     gold_min: int = 0
@@ -55,8 +69,6 @@ class MonsterDef:
     spell_cast_chance: int = 0  # percent
     loot_table_id: int = 0
     sprite_id: int = 0
-    group_size_min: int = 1
-    group_size_max: int = 1
     special_abilities: int = 0  # bitfield
     breath_weapon: AttackMode | None = None
 
@@ -93,6 +105,12 @@ class ItemDef:
     charges: int = 0
     spell_power: int = 0
     sprite_id: int = 0
+    # Special effect chances (percent)
+    paralyze_chance: int = 0
+    critical_chance: int = 0
+    knockout_chance: int = 0
+    # Armor class bonus (negative = better AC per Wiz6 conventions)
+    armor_class: int = 0
 
 
 # ---------------------------------------------------------------------------

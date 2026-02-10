@@ -29,6 +29,8 @@ bane = "bane.__main__:main"
 bane-dump = "tools.dbs_dumper:main"
 bane-sprites = "tools.sprite_viewer:main"
 bane-map = "tools.map_viewer:main"
+bane-pic = "tools.pic_viewer:main"
+bane-pic-scan = "tools.pic_scan:main"
 
 [tool.setuptools.packages.find]
 include = ["bane*", "tools*"]
