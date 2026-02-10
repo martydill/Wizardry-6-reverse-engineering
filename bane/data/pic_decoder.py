@@ -90,7 +90,7 @@ def _decode_tiled_planar(
       - Bytes 8-15: plane 1 (bit 1 of color)
       - Bytes 16-23: plane 2 (bit 2 of color)
       - Bytes 24-31: plane 3 (bit 3 of color)
-    Tiles are stored in row-major order across the frame.
+    Tiles are stored in column-major order (top to bottom, then left to right).
     """
     if width % 8 != 0 or height % 8 != 0:
         raise ValueError(f"Tiled planar decode requires 8x8 alignment, got {width}x{height}")
@@ -134,14 +134,15 @@ def _decode_tiled_planar(
 def _iter_frame_entries(
     decompressed: bytes,
     header_size: int,
-) -> list[tuple[int, int, int]]:
+) -> list[tuple[int, int, int, bytes]]:
     """Parse the 0x258-byte header into frame entries.
 
-    Each entry is 24 bytes (12 words). The layout we use is:
-      word0: data offset (from start of decompressed stream)
-      word1: width/height in tiles (low byte = width tiles, high byte = height tiles)
+    Each entry is 24 bytes (12 words).
+    Word 0: Offset
+    Word 1: Dimensions (Low=Width, High=Height)
+    Words 2-11: Bitmask (20 bytes) indicating present tiles.
     """
-    entries: list[tuple[int, int, int]] = []
+    entries: list[tuple[int, int, int, bytes]] = []
     record_count = header_size // PIC_FRAME_RECORD_SIZE
 
     for idx in range(record_count):
@@ -149,19 +150,24 @@ def _iter_frame_entries(
         end = start + PIC_FRAME_RECORD_SIZE
         if end > len(decompressed):
             break
-        words = struct.unpack("<12H", decompressed[start:end])
+        
+        # Read full record
+        record_data = decompressed[start:end]
+        words = struct.unpack("<2H", record_data[:4])
         offset = words[0]
         wh = words[1]
+        mask_bytes = record_data[4:] # 20 bytes
 
         if offset == 0 and wh == 0:
-            break
+            continue
 
         width_tiles = wh & 0xFF
         height_tiles = (wh >> 8) & 0xFF
+        
         if width_tiles == 0 or height_tiles == 0:
             continue
 
-        entries.append((offset, width_tiles, height_tiles))
+        entries.append((offset, width_tiles, height_tiles, mask_bytes))
 
     return entries
 
@@ -183,14 +189,49 @@ def decode_pic_frames(
     entries = _iter_frame_entries(decompressed, header_size)
     frames: list[Sprite] = []
 
-    for offset, width_tiles, height_tiles in entries:
+    for offset, width_tiles, height_tiles, mask_bytes in entries:
         width = width_tiles * 8
         height = height_tiles * 8
-        byte_len = width_tiles * height_tiles * 32
+        
+        # Calculate number of set bits to know payload size
+        set_bits = 0
+        for b in mask_bytes:
+            set_bits += b.bit_count()
+            
+        byte_len = set_bits * 32
+        
         if offset + byte_len > len(decompressed):
             continue
+            
         payload = decompressed[offset:offset + byte_len]
-        pixels = _decode_tiled_planar(payload, width, height, msb_first=msb_first)
+        
+        # Reconstruct full tiled planar data from sparse payload
+        full_data = bytearray(width_tiles * height_tiles * 32)
+        payload_ptr = 0
+        
+        # Iterate grid in Row-Major order
+        total_tiles = width_tiles * height_tiles
+        
+        for tile_idx in range(total_tiles):
+            # Check bit in mask
+            byte_pos = tile_idx // 8
+            bit_pos = tile_idx % 8
+            
+            is_set = False
+            if byte_pos < len(mask_bytes):
+                # Assuming LSB first: Bit 0 is first tile
+                if mask_bytes[byte_pos] & (1 << bit_pos):
+                    is_set = True
+            
+            if is_set:
+                if payload_ptr + 32 <= len(payload):
+                    full_data[tile_idx * 32 : (tile_idx + 1) * 32] = payload[payload_ptr : payload_ptr + 32]
+                    payload_ptr += 32
+        
+        # Now decode the fully reconstructed tiled planar data
+        # Note: We reverted to row-major in _decode_tiled_planar, which matches our grid iteration here.
+        pixels = _decode_tiled_planar(full_data, width, height, msb_first=msb_first)
+        
         frames.append(
             Sprite(
                 width=width,

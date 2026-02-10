@@ -29,3 +29,5 @@ gamedata/
 .vscode/
 *.swp
 *.swo
+*.png
+.claude/
