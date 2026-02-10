@@ -29,20 +29,25 @@ logger = logging.getLogger(__name__)
 EGA_64_PALETTE: list[tuple[int, int, int]] = []
 
 # Generate the 64-color EGA palette
-# Bits: i5 i4 i3 i2 i1 i0 where
-# i5=R', i4=G', i3=B', i2=R, i1=G, i0=B
-# R = (R' * 0xAA) + (R * 0x55), etc.
+# Bits: r g b R G B  (bit 5 is r, bit 0 is B)
+# Mapping for 6-bit value i:
+# Bit 0: B (blue high)
+# Bit 1: G (green high)
+# Bit 2: R (red high)
+# Bit 3: b (blue low)
+# Bit 4: g (green low)
+# Bit 5: r (red low)
 for i in range(64):
-    r_hi = (i >> 5) & 1
-    g_hi = (i >> 4) & 1
-    b_hi = (i >> 3) & 1
-    r_lo = (i >> 2) & 1
-    g_lo = (i >> 1) & 1
-    b_lo = i & 1
-    r = r_hi * 0xAA + r_lo * 0x55
-    g = g_hi * 0xAA + g_lo * 0x55
-    b = b_hi * 0xAA + b_lo * 0x55
-    EGA_64_PALETTE.append((r, g, b))
+    B = (i >> 0) & 1
+    G = (i >> 1) & 1
+    R = (i >> 2) & 1
+    b = (i >> 3) & 1
+    g = (i >> 4) & 1
+    r = (i >> 5) & 1
+    rv = R * 0xAA + r * 0x55
+    gv = G * 0xAA + g * 0x55
+    bv = B * 0xAA + b * 0x55
+    EGA_64_PALETTE.append((rv, gv, bv))
 
 
 # ---------------------------------------------------------------------------
@@ -50,22 +55,22 @@ for i in range(64):
 # This is what Wizardry 6 most likely uses.
 # ---------------------------------------------------------------------------
 DEFAULT_16_PALETTE_INDICES = [
-    0,   # 0: Black
-    1,   # 1: Blue
-    2,   # 2: Green
-    3,   # 3: Cyan
-    4,   # 4: Red
-    5,   # 5: Magenta
-    20,  # 6: Brown (dark yellow)
-    42,  # 7: Light gray
-    21,  # 8: Dark gray
-    57,  # 9: Light blue
-    58,  # 10: Light green
-    59,  # 11: Light cyan
-    60,  # 12: Light red
-    61,  # 13: Light magenta
-    62,  # 14: Yellow
-    63,  # 15: White
+    0,   # 0: Black (000000)
+    1,   # 1: Blue (000001)
+    2,   # 2: Green (000010)
+    3,   # 3: Cyan (000011)
+    4,   # 4: Red (000100)
+    5,   # 5: Magenta (000101)
+    20,  # 6: Brown (010100) - Special case for color 6
+    7,   # 7: Light gray (000111)
+    56,  # 8: Dark gray (111000)
+    57,  # 9: Light blue (111001)
+    58,  # 10: Light green (111010)
+    59,  # 11: Light cyan (111011)
+    60,  # 12: Light red (111100)
+    61,  # 13: Light magenta (111101)
+    62,  # 14: Yellow (111110)
+    63,  # 15: White (111111)
 ]
 
 DEFAULT_16_PALETTE: list[tuple[int, int, int]] = [
@@ -354,25 +359,30 @@ def decode_ega_file(path: str | Path) -> Sprite:
     pixels = [0] * (width * height)
     bytes_per_row = width // 8
     
-    # Aggregate header/palette data from the tail of all 4 planes
-    # Each plane has 192 bytes of "padding" at the end.
+    # Image data consists of 4 planes of 8000 bytes each, starting at 8k boundaries.
+    # The plane order in Wiz6 .EGA files maps to bit positions as follows:
+    # Plane 0 -> Bit 2 (Red)
+    # Plane 1 -> Bit 0 (Blue)
+    # Plane 2 -> Bit 1 (Green)
+    # Plane 3 -> Bit 3 (Intensity)
+    plane_to_bit = {0: 2, 1: 0, 2: 1, 3: 3}
+
     header_data = bytearray()
     for plane in range(4):
         plane_base = plane * 8192
+        bit_pos = plane_to_bit[plane]
         header_data.extend(data[plane_base + 8000 : plane_base + 8192])
         
-        # Decode plane data (starts at plane_base)
         for y in range(height):
             row_base = plane_base + y * bytes_per_row
             for bx in range(bytes_per_row):
                 byte_val = data[row_base + bx]
                 for bit in range(8):
-                    # Standard EGA: MSB first (bit 7 is leftmost pixel)
                     x = bx * 8 + (7 - bit)
                     if byte_val & (1 << bit):
-                        pixels[y * width + x] |= (1 << plane)
+                        pixels[y * width + x] |= (1 << bit_pos)
 
-    # Extract first 16 colors from the aggregated tail data
+    # Extract palette from the aggregated tail data
     palette = []
     has_palette = False
     for i in range(16):
