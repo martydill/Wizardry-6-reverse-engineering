@@ -77,6 +77,27 @@ DEFAULT_16_PALETTE: list[tuple[int, int, int]] = [
     EGA_64_PALETTE[i] for i in DEFAULT_16_PALETTE_INDICES
 ]
 
+# Wizardry 6 TITLEPAG.EGA custom palette (extracted from reference screenshot)
+# Uses VGA DAC encoding: 6-bit values (0-63) × 4 = 8-bit (0, 84, 168, 252)
+TITLEPAG_PALETTE: list[tuple[int, int, int]] = [
+    (  0,   0,   0),  # 0: Black
+    ( 84,  84,  84),  # 1: Dark gray
+    (168, 168, 168),  # 2: Light gray
+    (252, 252, 252),  # 3: White
+    (168,   0,   0),  # 4: Red
+    (168,  84,   0),  # 5: Brown
+    (252, 252,  84),  # 6: Yellow
+    ( 84, 252, 252),  # 7: Light cyan
+    (  0, 168,   0),  # 8: Green
+    (168,   0, 168),  # 9: Magenta
+    (252,  84, 252),  # 10: Light magenta
+    (252,  84,  84),  # 11: Light red
+    ( 84, 252,  84),  # 12: Light green
+    (  0,   0, 168),  # 13: Blue
+    (  0, 168, 168),  # 14: Cyan
+    ( 84,  84, 252),  # 15: Light blue
+]
+
 
 @dataclass
 class Sprite:
@@ -327,6 +348,77 @@ class EGADecoder:
             palette=list(self.palette),
         )
 
+    def decode_tiled_planar(
+        self,
+        data: bytes,
+        width: int,
+        height: int,
+        plane_order: list[int] | None = None,
+        msb_first: bool = True,
+        row_major: bool = True,
+    ) -> Sprite:
+        """Decode EGA tiled planar format (used by WPORT and monster .PIC files).
+
+        Each 32-byte block is one 8x8 tile:
+          - Bytes 0-7: plane 0 (bit 0 of color)
+          - Bytes 8-15: plane 1 (bit 1 of color)
+          - Bytes 16-23: plane 2 (bit 2 of color)
+          - Bytes 24-31: plane 3 (bit 3 of color)
+        
+        Args:
+            data: Raw tiled planar byte data
+            width: Image width in pixels (must be multiple of 8)
+            height: Image height in pixels (must be multiple of 8)
+            plane_order: Optional custom plane ordering (default [0,1,2,3])
+            msb_first: If True, MSB is leftmost pixel in each byte
+            row_major: If True, tiles are stored left-to-right, then top-to-bottom
+        """
+        if width % 8 != 0 or height % 8 != 0:
+            raise ValueError(f"Tiled planar decode requires 8x8 alignment, got {width}x{height}")
+
+        tiles_x = width // 8
+        tiles_y = height // 8
+        expected_tiles = tiles_x * tiles_y
+        expected_bytes = expected_tiles * 32
+        
+        if len(data) < expected_bytes:
+            data = data + b"\x00" * (expected_bytes - len(data))
+
+        pixels = [0] * (width * height)
+        order = plane_order or [0, 1, 2, 3]
+        
+        for tile_idx in range(expected_tiles):
+            tile_base = tile_idx * 32
+            if row_major:
+                tile_x = tile_idx % tiles_x
+                tile_y = tile_idx // tiles_x
+            else:
+                tile_x = tile_idx // tiles_y
+                tile_y = tile_idx % tiles_y
+
+            for row in range(8):
+                for bit in range(8):
+                    if msb_first:
+                        mask = 0x80 >> bit
+                    else:
+                        mask = 1 << bit
+                    
+                    color = 0
+                    for plane_idx, target_plane in enumerate(order):
+                        if data[tile_base + row + plane_idx * 8] & mask:
+                            color |= (1 << target_plane)
+
+                    px = tile_x * 8 + bit
+                    py = tile_y * 8 + row
+                    pixels[py * width + px] = color
+
+        return Sprite(
+            width=width,
+            height=height,
+            pixels=pixels,
+            palette=list(self.palette),
+        )
+
     def decode_byte_per_pixel(self, data: bytes, width: int, height: int) -> Sprite:
         """Decode data where each byte is a single palette index."""
         pixel_count = width * height
@@ -358,62 +450,118 @@ class EGADecoder:
 
 
 def decode_ega_file(path: str | Path) -> Sprite:
-    """Decode a full-screen .EGA file (e.g., TITLEPAG.EGA).
+    """Decode an .EGA file.
 
-    These files are typically 32768 bytes, consisting of 4 planes of 8192 bytes each.
-    Each 8192-byte block contains:
-    - 8000 bytes of image data (320x200 1bpp)
-    - 192 bytes of padding/palette data
+    Handles full-screen 320x200 images (32768 bytes) and 
+    character portrait collections (4096 bytes).
     """
     path = Path(path)
     data = path.read_bytes()
 
-    if len(data) != 32768:
-        # Fallback for non-standard EGA files (like fonts)
-        return Sprite(0, 0, [], [])
+    if len(data) == 32768:
+        # Full-screen sequential planar (e.g. TITLEPAG.EGA)
+        decoder = EGADecoder(palette=TITLEPAG_PALETTE)
+        width, height = 320, 200
+        bytes_per_plane_data = width * height // 8  # 8000 bytes
+        image_data = bytearray()
 
-    width, height = 320, 200
-    pixels = [0] * (width * height)
-    bytes_per_row = width // 8
-    
-    # Image data consists of 4 planes of 8000 bytes each, starting at 8k boundaries.
-    # The plane order in Wiz6 .EGA files maps to bit positions as follows:
-    # Plane 0 -> Bit 2 (Red)
-    # Plane 1 -> Bit 0 (Blue)
-    # Plane 2 -> Bit 1 (Green)
-    # Plane 3 -> Bit 3 (Intensity)
-    plane_to_bit = {0: 2, 1: 0, 2: 1, 3: 3}
+        for plane in range(4):
+            plane_start = plane * 8192
+            image_data.extend(data[plane_start : plane_start + bytes_per_plane_data])
 
-    header_data = bytearray()
-    for plane in range(4):
-        plane_base = plane * 8192
-        bit_pos = plane_to_bit[plane]
-        header_data.extend(data[plane_base + 8000 : plane_base + 8192])
+        # Wizardry 6 plane ordering found through testing
+        return decoder.decode_planar(
+            bytes(image_data),
+            width=width,
+            height=height,
+            planes=4,
+            msb_first=True,
+            plane_order=[3, 0, 2, 1],
+        )
+    elif len(data) == 4096 and "WPORT" in path.name.upper():
+        # Character portrait collection
+        # 14 portraits of 24x24 tiled planar (14 * 288 = 4032 bytes)
+        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+        return decoder.decode_tiled_planar(
+            data[:288],
+            width=24,
+            height=24,
+        )
+    elif "WFONT" in path.name.upper():
+        # Font collection
+        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
         
-        for y in range(height):
-            row_base = plane_base + y * bytes_per_row
-            for bx in range(bytes_per_row):
-                byte_val = data[row_base + bx]
-                for bit in range(8):
-                    x = bx * 8 + (7 - bit)
-                    if byte_val & (1 << bit):
-                        pixels[y * width + x] |= (1 << bit_pos)
+        # Determine char size based on file size
+        if len(data) == 4096: # WFONT1, WFONT2...
+            # 256 chars * 16 bytes = 4096. 8x16 1bpp.
+            char_width, char_height = 8, 16
+        elif len(data) == 1024: # WFONT0
+            # 128 chars * 8 bytes = 1024. 8x8 1bpp.
+            char_width, char_height = 8, 8
+        else:
+            # Unknown, default to 8x8 and read what we can
+            char_width, char_height = 8, 8
+            
+        bytes_per_char = (char_width * char_height) // 8
+        pixels = []
+        char_data = data[:bytes_per_char]
+        for b in char_data:
+            for bit in range(7, -1, -1):
+                pixels.append(15 if (b & (1 << bit)) else 0)
+        return Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette)
+    else:
+        # Fallback/Unknown
+        logger.warning(f"Unknown EGA file format: {path.name} ({len(data)} bytes)")
+        return Sprite(width=32, height=32, pixels=[0]*(32*32), palette=list(DEFAULT_16_PALETTE))
 
-    # Extract palette from the aggregated tail data
-    palette = []
-    has_palette = False
-    for i in range(16):
-        r = header_data[i * 3]
-        g = header_data[i * 3 + 1]
-        b = header_data[i * 3 + 2]
-        if r != 0 or g != 0 or b != 0:
-            has_palette = True
-        palette.append((r, g, b))
 
-    if not has_palette:
-        palette = list(DEFAULT_16_PALETTE)
+def decode_ega_frames(path: str | Path) -> list[Sprite]:
+    """Decode all frames from an .EGA collection file."""
+    path = Path(path)
+    data = path.read_bytes()
+    frames: list[Sprite] = []
 
-    return Sprite(width, height, pixels, palette)
+    if len(data) == 4096 and "WPORT" in path.name.upper():
+        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+        # 14 frames of 24x24 tiled planar (288 bytes each)
+        for i in range(14):
+            offset = i * 288
+            frames.append(
+                decoder.decode_tiled_planar(
+                    data[offset : offset + 288],
+                    width=24,
+                    height=24,
+                )
+            )
+    elif "WFONT" in path.name.upper():
+        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+        
+        if len(data) == 4096:
+            char_width, char_height = 8, 16
+            count = 256
+        elif len(data) == 1024:
+            char_width, char_height = 8, 8
+            count = 128
+        else:
+            char_width, char_height = 8, 8
+            count = len(data) // 8
+
+        bytes_per_char = (char_width * char_height) // 8
+        
+        for i in range(count):
+            offset = i * bytes_per_char
+            if offset + bytes_per_char > len(data):
+                break
+            char_data = data[offset : offset + bytes_per_char]
+            pixels = []
+            for b in char_data:
+                for bit in range(7, -1, -1):
+                    pixels.append(15 if (b & (1 << bit)) else 0)
+            frames.append(Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette))
+    elif len(data) == 32768:
+        frames.append(decode_ega_file(path))
+    
+    return frames
 
 
 class SpriteAtlas:

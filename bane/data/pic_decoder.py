@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import struct
 
-from bane.data.sprite_decoder import DEFAULT_16_PALETTE, Sprite
+from bane.data.sprite_decoder import DEFAULT_16_PALETTE, Sprite, EGADecoder
 
 
 PIC_DATA_SIZE = 0x5800
@@ -77,61 +77,11 @@ def _decode_rle(data: bytes) -> bytes:
     return bytes(out)
 
 
-def _decode_tiled_planar(
-    data: bytes,
-    width: int,
-    height: int,
-    msb_first: bool = True,
-) -> list[int]:
-    """Decode tiled planar format used by Wizardry 6 .PIC files.
+    # Decode from tiled planar format
+    decoder = EGADecoder()
+    sprite = decoder.decode_tiled_planar(payload, width, height, msb_first=msb_first)
 
-    Each 32-byte block is one 8x8 tile:
-      - Bytes 0-7: plane 0 (bit 0 of color)
-      - Bytes 8-15: plane 1 (bit 1 of color)
-      - Bytes 16-23: plane 2 (bit 2 of color)
-      - Bytes 24-31: plane 3 (bit 3 of color)
-    Tiles are stored in column-major order (top to bottom, then left to right).
-    """
-    if width % 8 != 0 or height % 8 != 0:
-        raise ValueError(f"Tiled planar decode requires 8x8 alignment, got {width}x{height}")
-
-    tiles_x = width // 8
-    tiles_y = height // 8
-    expected_tiles = tiles_x * tiles_y
-    expected_bytes = expected_tiles * 32
-    if len(data) < expected_bytes:
-        data = data + b"\x00" * (expected_bytes - len(data))
-
-    pixels = [0] * (width * height)
-    read_mask_for = (lambda bit: 0x80 >> bit) if msb_first else (lambda bit: 1 << bit)
-
-    for tile_index in range(expected_tiles):
-        tile_base = tile_index * 32
-        tile_x = tile_index % tiles_x
-        tile_y = tile_index // tiles_x
-
-        for row in range(8):
-            for bit in range(8):
-                read_mask = read_mask_for(bit)
-                color = 0
-
-                if data[tile_base + row] & read_mask:
-                    color |= 0x01
-                if data[tile_base + row + 8] & read_mask:
-                    color |= 0x02
-                if data[tile_base + row + 16] & read_mask:
-                    color |= 0x04
-                if data[tile_base + row + 24] & read_mask:
-                    color |= 0x08
-
-                x = tile_x * 8 + bit
-                y = tile_y * 8 + row
-                pixels[y * width + x] = color
-
-    return pixels
-
-
-def _iter_frame_entries(
+    return sprite
     decompressed: bytes,
     header_size: int,
 ) -> list[tuple[int, int, int, bytes]]:
@@ -230,16 +180,10 @@ def decode_pic_frames(
         
         # Now decode the fully reconstructed tiled planar data
         # Note: We reverted to row-major in _decode_tiled_planar, which matches our grid iteration here.
-        pixels = _decode_tiled_planar(full_data, width, height, msb_first=msb_first)
+        decoder = EGADecoder()
+        sprite = decoder.decode_tiled_planar(bytes(full_data), width, height, msb_first=msb_first)
         
-        frames.append(
-            Sprite(
-                width=width,
-                height=height,
-                pixels=pixels,
-                palette=list(DEFAULT_16_PALETTE),
-            )
-        )
+        frames.append(sprite)
 
     return frames
 

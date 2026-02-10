@@ -12,24 +12,32 @@ from pathlib import Path
 
 import pygame
 
-from bane.data.sprite_decoder import decode_ega_file
+from bane.data.sprite_decoder import decode_ega_file, decode_ega_frames
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="bane-ega",
-        description="View Wizardry 6 full-screen .EGA files",
+        description="View Wizardry 6 EGA files (full-screen or collections)",
     )
     parser.add_argument("file", type=Path, help="Path to .EGA file")
     parser.add_argument("--scale", type=int, default=2, help="Display scale factor")
+    parser.add_argument("--frame", type=int, default=0, help="Initial frame index")
     args = parser.parse_args()
 
     pygame.init()
     
     try:
-        sprite = decode_ega_file(args.file)
+        frames = decode_ega_frames(args.file)
+        if not frames:
+            print(f"No frames found in {args.file}")
+            return
+        frame_index = max(0, min(args.frame, len(frames) - 1))
+        sprite = frames[frame_index]
     except Exception as e:
         print(f"Error loading {args.file}: {e}")
+        import traceback
+        traceback.print_exc()
         return
 
     scale = max(1, args.scale)
@@ -47,6 +55,12 @@ def main() -> None:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                elif len(frames) > 1 and event.key in (pygame.K_RIGHT, pygame.K_SPACE):
+                    frame_index = (frame_index + 1) % len(frames)
+                    sprite = frames[frame_index]
+                elif len(frames) > 1 and event.key == pygame.K_LEFT:
+                    frame_index = (frame_index - 1) % len(frames)
+                    sprite = frames[frame_index]
 
         screen.fill((20, 20, 30))
 
@@ -58,7 +72,11 @@ def main() -> None:
         y = (win_h - scaled.height) // 2
         screen.blit(surf, (x, y))
 
-        info = f"{args.file.name} ({sprite.width}x{sprite.height}) - ESC: Quit"
+        if len(frames) > 1:
+            info = f"{args.file.name} frame {frame_index + 1}/{len(frames)} ({sprite.width}x{sprite.height}) - ESC: Quit, Left/Right: Frame"
+        else:
+            info = f"{args.file.name} ({sprite.width}x{sprite.height}) - ESC: Quit"
+        
         text_surf = font.render(info, True, (200, 200, 200))
         screen.blit(text_surf, (10, win_h - 30))
 
