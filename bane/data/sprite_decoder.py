@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +333,60 @@ class EGADecoder:
         # Pad if fewer than 16
         while len(self.palette) < 16:
             self.palette.append((0, 0, 0))
+
+
+def decode_ega_file(path: str | Path) -> Sprite:
+    """Decode a full-screen .EGA file (e.g., TITLEPAG.EGA).
+
+    These files are typically 32768 bytes, consisting of 4 planes of 8192 bytes each.
+    Each 8192-byte block contains:
+    - 8000 bytes of image data (320x200 1bpp)
+    - 192 bytes of padding/palette data
+    """
+    path = Path(path)
+    data = path.read_bytes()
+
+    if len(data) != 32768:
+        # Fallback for non-standard EGA files (like fonts)
+        return Sprite(0, 0, [], [])
+
+    width, height = 320, 200
+    pixels = [0] * (width * height)
+    bytes_per_row = width // 8
+    
+    # Aggregate header/palette data from the tail of all 4 planes
+    # Each plane has 192 bytes of "padding" at the end.
+    header_data = bytearray()
+    for plane in range(4):
+        plane_base = plane * 8192
+        header_data.extend(data[plane_base + 8000 : plane_base + 8192])
+        
+        # Decode plane data (starts at plane_base)
+        for y in range(height):
+            row_base = plane_base + y * bytes_per_row
+            for bx in range(bytes_per_row):
+                byte_val = data[row_base + bx]
+                for bit in range(8):
+                    # Standard EGA: MSB first (bit 7 is leftmost pixel)
+                    x = bx * 8 + (7 - bit)
+                    if byte_val & (1 << bit):
+                        pixels[y * width + x] |= (1 << plane)
+
+    # Extract first 16 colors from the aggregated tail data
+    palette = []
+    has_palette = False
+    for i in range(16):
+        r = header_data[i * 3]
+        g = header_data[i * 3 + 1]
+        b = header_data[i * 3 + 2]
+        if r != 0 or g != 0 or b != 0:
+            has_palette = True
+        palette.append((r, g, b))
+
+    if not has_palette:
+        palette = list(DEFAULT_16_PALETTE)
+
+    return Sprite(width, height, pixels, palette)
 
 
 class SpriteAtlas:
