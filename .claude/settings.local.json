@@ -19,7 +19,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(curl:*)",
       "Bash(ls:*)",
-      "WebFetch(domain:preview.redd.it)"
+      "WebFetch(domain:preview.redd.it)",
+      "WebFetch(domain:www.oldgames.sk)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   }
 }
