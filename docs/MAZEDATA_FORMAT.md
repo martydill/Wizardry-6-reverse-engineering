@@ -12,25 +12,30 @@ MAZEDATA.EGA contains all wall, floor, and ceiling textures for Wizardry 6's dun
 
 ## Structure
 
-### Image Data (bytes 0-31,999)
-The first 32,000 bytes contain a 320×200 EGA image in **sequential planar format**:
+### Image Data (bytes 0-95,999)
+The file contains **three** consecutive 320×200 EGA images in **sequential planar format**, each 32,000 bytes:
 
-```
-Sequential planar layout:
-- Plane 0 (bit 0): 8,000 bytes (320×200/8)
-- Plane 1 (bit 1): 8,000 bytes
-- Plane 2 (bit 2): 8,000 bytes
-- Plane 3 (bit 3): 8,000 bytes
-Total: 32,000 bytes
+- **Atlas 0**: 0 - 31,999
+- **Atlas 1**: 32,000 - 63,999
+- **Atlas 2**: 64,000 - 95,999
 
-Each plane stores all pixels for that bit position before moving to the next plane.
-```
+Each atlas uses sequential planar layout:
+- Plane 0: 8,000 bytes
+- Plane 1: 8,000 bytes
+- Plane 2: 8,000 bytes
+- Plane 3: 8,000 bytes
 
-### Additional Data (bytes 32,000-102,302)
-The remaining 70,303 bytes likely contains additional textures, animation frames, or alternate texture sets.
+### Leftover Data (bytes 96,000-102,302)
+The remaining 6,303 bytes contain additional 8x8 tiles or UI elements.
 
-## Important: No Palette Header!
-Unlike other .EGA files (TITLEPAG.EGA, DRAGONSC.EGA, GRAVEYRD.EGA), **MAZEDATA.EGA has NO 768-byte palette header**. It uses the default 16-color EGA palette.
+## Important: Palette and Plane Order
+- **Palette**: Uses the **TITLEPAG_PALETTE** (shades of gray at indices 0-3), NOT the standard IBM EGA palette.
+- **Plane Order**: Sequential planar with order **[0, 1, 2, 3]**.
+- **Bit Direction**: MSB-first.
+
+This combination correctly renders the gray brick wall textures that are primary to the game's dungeon environments.
+
+
 
 ## Image Content
 The 320×200 texture atlas shows horizontal rows of textures:

@@ -77,11 +77,7 @@ def _decode_rle(data: bytes) -> bytes:
     return bytes(out)
 
 
-    # Decode from tiled planar format
-    decoder = EGADecoder()
-    sprite = decoder.decode_tiled_planar(payload, width, height, msb_first=msb_first)
-
-    return sprite
+def _iter_frame_entries(
     decompressed: bytes,
     header_size: int,
 ) -> list[tuple[int, int, int, bytes]]:
