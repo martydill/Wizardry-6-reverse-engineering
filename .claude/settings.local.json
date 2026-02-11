@@ -24,7 +24,10 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "WebFetch(domain:www.crimsontear.com)",
+      "WebFetch(domain:gamefaqs.gamespot.com)",
+      "WebFetch(domain:archive.org)"
     ]
   }
 }
