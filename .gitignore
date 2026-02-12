@@ -23,6 +23,7 @@ gamedata/
 *.HDR
 *.BCF
 *.EXE
+output/
 
 # IDE
 .idea/
