@@ -1,20 +1,6 @@
 # Wizardry 6: Bane of the Cosmic Forge reverse engineering adventures
 
+This repo is an attempt to reverse engineer as much of Wizardy 6 as possible.
+There have been a number of previous reverse engineering efforts such as [Cosmic Forge](https://spershin.wixsite.com/mad-god-tiny-hut/cosmic-forge) editor and various save game modification tools such as baneedit, but they are closed source and the file formats remain largely undocumented. 
 
-File status:
-
-|Files|Status|
-|---|---|
-|WPORT(x).EGA|Can render portraits with inaccurate colors|
-|GRAVEYARD.EGA/TITLEPAG.EGA/DRAGONSC.EGA|Can render images with inaccurate colors|
-|WFONT(x).EGA|Can render fonts|
-|MON(xx).PIC|Can render monster animation frames|
-|SCENARIO.DBS - XP tables| Yes|
-|SCENARIO.DBS - Item tables| Yes|
-|SCENARIO.DBS - Monster tables| Yes|
-|SCENARIO.DBS - Loot tables| Yes|
-|SCENARIO.DBS - Maps|No|
-|SCENARIO.DBS - Events|No|
-|MAZEDATA.EGA textures|No|
-|SOUND(x).SND|No|
-|MSG.DBS / MSG.HDR|No|
+Let's see if we can change that!

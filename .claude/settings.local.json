@@ -28,7 +28,10 @@
       "WebFetch(domain:www.crimsontear.com)",
       "WebFetch(domain:gamefaqs.gamespot.com)",
       "WebFetch(domain:archive.org)",
-      "WebFetch(domain:www.myabandonware.com)"
+      "WebFetch(domain:www.myabandonware.com)",
+      "Bash(file:*)",
+      "Bash(xxd:*)",
+      "Bash(cat:*)"
     ]
   }
 }
