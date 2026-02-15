@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "WebSearch",
+      "WebFetch(domain:moddingwiki.shikadi.net)",
+      "WebFetch(domain:www.fileformat.info)",
+      "WebFetch(domain:rpghq.org)",
+      "WebFetch(domain:shikadi.net)",
+      "WebFetch(domain:www.vogons.org)",
+      "WebFetch(domain:www.gamedev.net)",
+      "WebFetch(domain:mad-god.webs.com)",
+      "WebFetch(domain:steamcommunity.com)",
+      "WebFetch(domain:segaxtreme.net)",
+      "WebFetch(domain:www.romhacking.net)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:www.tk421.net)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:preview.redd.it)",
+      "WebFetch(domain:www.oldgames.sk)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(fi)",
+      "Bash(done)",
+      "WebFetch(domain:www.crimsontear.com)",
+      "WebFetch(domain:gamefaqs.gamespot.com)",
+      "WebFetch(domain:archive.org)",
+      "WebFetch(domain:www.myabandonware.com)",
+      "Bash(file:*)",
+      "Bash(xxd:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}
