@@ -162,6 +162,29 @@ Therefore, interpretation of `0x1F/0x1E/0x0E` is likely done by a different
 higher-level script/dialog path (or treated as drawable glyph codes in some UI
 contexts), and remains the next RE target.
 
+## Broader overlay scan follow-up
+
+A cross-binary scan for compares against `0x1F/0x1E/0x0E` found many hits in
+`WMEXE.OVR` / `WPOPS.OVR`, but disassembly shows these are predominantly game
+state structure checks (e.g. `cmp byte ptr [bx+si+0x1e], ...`) rather than text
+stream byte parsing.
+
+Notable examples:
+
+- `WMEXE` logical `0x5628` / `0x5667`: checks object/NPC state at offsets
+  `+0x1E`, `+0x22`, etc.
+- `WPOPS` logical `0x8252` / `0x826E` / `0x887F`: checks per-entity flags at
+  `+0x1E`, `+0x1F`.
+
+These do not explain message control-byte rendering behavior.
+
+## Formatter routine note (`WROOT`)
+
+`WROOT` around logical `0x3B9F` is a `printf`-style formatter that explicitly
+parses `%` format directives and width/flags. This is a general formatter path,
+not the core `MSG.DBS` record decoder (`0x075B -> 0x29D9`), but may still be
+used by some UI scripts that embed `%`-style tokens.
+
 ### Message handle initialization path
 
 `WROOT` around `0x0CD6` builds filenames into buffer `0x35EA` and opens files via
@@ -192,3 +215,47 @@ cannot be treated as the final table content.
 
 This is a layout/printing interpreter, not the unresolved token-expansion
 logic that still causes textual garble.
+
+## Additional confirmed behavior (range stepping)
+
+### Hidden sub-IDs are real runtime records
+
+Using the runtime-stepping model directly (start pointer + record stepping by
+`msg_id - start_id`) reveals IDs not explicitly listed as top-level keys in the
+old parser assumptions. Example:
+
+- `10030`: `YOU ARE IN THE ENTRANCE CHAMBER OF THE`
+- `10031`: `CASTLE.  IT APPEARS TO BE EMPTY, AND A`
+- `10032`: `^HEAVY COAT OF DUST COVERS THE FLOOR.`
+- `10033`: `@SMALL SCAMPERING NOISES ECHO DOWN FAR`
+- `10034`: `DISTANT CORRIDORS, A REMINDER THAT IT`
+- `10035`: `^IS YOU WHO ARE THE INTRUDER HERE...`
+
+This confirms that `MSG.HDR` low-byte span is an ID range and the game decodes
+single records per requested ID by pointer stepping, not by "next offset span"
+slicing.
+
+### Cross-bank continuation pattern
+
+Some logical text blocks continue in the next header entry when:
+
+- IDs are contiguous across entries (`next.start_id == cur.start_id + cur.span + 1`)
+- bank increments by 1 (`next.bank == cur.bank + 1`)
+- current entry starts near end-of-bank (`cur.offset >= 960`)
+- next entry starts near bank start (`next.offset <= 64`)
+
+`10030 -> 10033` is the canonical observed example.
+
+### Additional `WPCVW` caller context
+
+Disassembly around `WPCVW:0x8EE0` shows multiple calls into the same text
+window routine at `0x8DC0`, passing immediate message IDs from event logic,
+for example:
+
+- `push 0x2C56 ; call 0x8DC0`
+- `push 0x2FA8 ; call 0x8DC0`
+- `push 0x02D5 ; call 0x8DC0`
+
+This reinforces that renderer-side behavior is centralized in `0x8DC0` and
+that message-specific control handling should be decoded upstream (record data
+or higher script state), not by per-message hardcoded text transforms.
