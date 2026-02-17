@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import struct
 
-from bane.data.sprite_decoder import DEFAULT_16_PALETTE, Sprite, EGADecoder
+from bane.data.sprite_decoder import DEFAULT_16_PALETTE, TITLEPAG_PALETTE, Sprite, EGADecoder
 
 
 PIC_DATA_SIZE = 0x5800
@@ -158,7 +158,7 @@ def decode_pic_frames(
         full_data = bytearray(width_tiles * height_tiles * 32)
         payload_ptr = 0
         
-        # Iterate grid in Row-Major order
+        # Tile indices in the mask are column-major (bit 0=top-left, 1=bottom-left, 2=top-right, ...)
         total_tiles = width_tiles * height_tiles
         
         for tile_idx in range(total_tiles):
@@ -177,10 +177,10 @@ def decode_pic_frames(
                     full_data[tile_idx * 32 : (tile_idx + 1) * 32] = payload[payload_ptr : payload_ptr + 32]
                     payload_ptr += 32
         
-        # Now decode the fully reconstructed tiled planar data
-        # Note: We reverted to row-major in _decode_tiled_planar, which matches our grid iteration here.
-        decoder = EGADecoder()
-        sprite = decoder.decode_tiled_planar(bytes(full_data), width, height, msb_first=msb_first)
+        # Tiles are stored column-major: tile 0=top-left, 1=bottom-left, 2=top-right, 3=bottom-right.
+        # Use row_major=False so decode_tiled_planar maps tile indices to (col, row) correctly.
+        decoder = EGADecoder(palette=list(TITLEPAG_PALETTE))
+        sprite = decoder.decode_tiled_planar(bytes(full_data), width, height, msb_first=msb_first, row_major=False)
         
         frames.append(sprite)
 
@@ -297,9 +297,9 @@ def decode_pic_bytes(
             width = 64
             height = max(1, total_pixels // 64)
 
-    # Decode from tiled planar format
-    decoder = EGADecoder()
-    sprite = decoder.decode_tiled_planar(payload, width, height, msb_first=True)
+    # Decode from tiled planar format (column-major tile order)
+    decoder = EGADecoder(palette=list(TITLEPAG_PALETTE))
+    sprite = decoder.decode_tiled_planar(payload, width, height, msb_first=True, row_major=False)
 
     return sprite
 

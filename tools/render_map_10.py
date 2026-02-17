@@ -235,7 +235,15 @@ def render_map(cells, width, height, cell_size=32):
     pygame.quit()
 
 def main():
+    import sys
+    
     filepath = Path("gamedata/SCENARIO.DBS")
+    offset = 40960
+    
+    if len(sys.argv) > 1:
+        filepath = Path(sys.argv[1])
+    if len(sys.argv) > 2:
+        offset = int(sys.argv[2])
 
     if not filepath.exists():
         print(f"Error: {filepath} not found")
@@ -244,12 +252,10 @@ def main():
     print("Wizardry 6 - Map 10 Renderer")
     print("="*60)
     print()
-    print("Loading map from SCENARIO.DBS @ offset 0xA000 (40960)")
+    print(f"Loading map from {filepath} @ offset {offset}")
     print("Map size: 16x16")
     print()
 
-    # Load map 10 (16x16) from offset 40960
-    offset = 40960
     width = 16
     height = 16
 

@@ -453,6 +453,80 @@ class EGADecoder:
             self.palette.append((0, 0, 0))
 
 
+def decode_mazedata_tiles(path: str | Path) -> list[Sprite]:
+    """Decode all wall-texture tiles from a MAZEDATA.EGA file.
+
+    MAZEDATA.EGA stores 153 tile primitives used to assemble the 3D dungeon
+    view.  The file has two sections:
+
+    Header (0x000 – 0xA26):
+        - Bytes 0-1:  N,  tile count (LE16, = 153)
+        - Bytes 2-3:  N2, display-list record count (LE16, = 366)
+        - Bytes 4 .. 4+N*5-1: N × 5-byte tile descriptors
+        - Bytes 4+N*5 .. 4+N*5+5*N2-1: display-list table; each of the N2
+          records is 4 bytes [b0, tile_id_1indexed, x_bytes, y_pixels] plus
+          1 zero-byte group separator; groups of records form composite sprites
+
+    Pixel data starts at offset 4 + N*5 + 5*N2 = 0xA27 (for the shipped file).
+
+    Each 5-byte descriptor:
+        - Bytes 0-1: segment S (LE16); absolute byte offset = S×16 + B2
+        - Byte  2:   byte offset B2 within the segment (0, 4, 8, or 12)
+        - Byte  3:   width_units W  (tile width = W × 8 pixels)
+        - Byte  4:   height H (in pixels)
+
+    Pixel data (offset 0x800 onward):
+        Sequential planar EGA — 4 planes stored consecutively within each tile:
+            Plane 0: W × H bytes
+            Plane 1: W × H bytes
+            Plane 2: W × H bytes
+            Plane 3: W × H bytes
+        Total bytes per tile = 4 × W × H
+
+    Tiles represent the same wall face at different rendering distances/positions,
+    composed by the dungeon renderer via the display-list table.
+    """
+    path = Path(path)
+    data = path.read_bytes()
+
+    n  = data[0] | (data[1] << 8)  # tile count (153)
+    n2 = data[2] | (data[3] << 8)  # display-list record count (366)
+    dl_start = 4 + n * 5
+    # Display-list entries are 5 bytes each (4-byte record + 1-byte zero separator).
+    # Pixel data begins immediately after the display list.
+    PIXEL_DATA_OFFSET = dl_start + 5 * n2
+
+    decoder = EGADecoder(palette=list(TITLEPAG_PALETTE))
+    sprites: list[Sprite] = []
+
+    for i in range(n):
+        base = 4 + i * 5
+        if base + 5 > len(data):
+            break
+        seg  = data[base] | (data[base + 1] << 8)
+        b2   = data[base + 2]          # byte offset (0/4/8/12)
+        w_units = data[base + 3]       # width / 8
+        height  = data[base + 4]       # height in pixels
+        abs_off  = seg * 16 + b2       # byte offset from start of pixel data
+        file_off = PIXEL_DATA_OFFSET + abs_off
+        width    = w_units * 8
+        tile_bytes = 4 * w_units * height
+
+        if width == 0 or height == 0:
+            sprites.append(Sprite(width=8, height=8, pixels=[0] * 64, palette=list(TITLEPAG_PALETTE)))
+            continue
+        if file_off + tile_bytes > len(data):
+            logger.warning("MAZEDATA tile %d out of bounds at 0x%05X", i, file_off)
+            sprites.append(Sprite(width=width, height=height, pixels=[0] * (width * height), palette=list(TITLEPAG_PALETTE)))
+            continue
+
+        payload = data[file_off : file_off + tile_bytes]
+        sprite  = decoder.decode_planar(payload, width=width, height=height, msb_first=True)
+        sprites.append(sprite)
+
+    return sprites
+
+
 def decode_ega_file(path: str | Path) -> Sprite:
     """Decode an .EGA file.
 
@@ -529,18 +603,11 @@ def decode_ega_frames(path: str | Path) -> list[Sprite]:
     if len(data) == 32768:
         # Single full-screen image with 8192-byte plane stride (TITLEPAG, DRAGONSC, etc.)
         frames.append(decode_ega_file(path))
-    elif len(data) >= 32000:
-        # MAZEDATA.EGA style: multiple sequential 32000-byte images, no palette header
-        offset = 0
-        while offset + 32000 <= len(data):
-            decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
-            frames.append(decoder.decode_planar(
-                data[offset : offset + 32000],
-                width=320,
-                height=200,
-                msb_first=True
-            ))
-            offset += 32000
+    elif "MAZEDATA" in path.name.upper():
+        # MAZEDATA.EGA: tile atlas of 153 wall-texture primitives.
+        # Header (0x000–0x7FF) contains N and 5-byte tile descriptors;
+        # pixel data starts at 0x800 in sequential planar EGA format.
+        frames.extend(decode_mazedata_tiles(path))
     elif len(data) == 4096 and "WPORT" in path.name.upper():
         decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
         # 14 frames of 24x24 tiled planar (288 bytes each)

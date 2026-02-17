@@ -23,9 +23,9 @@ def extract():
     output_dir = Path("output/mazedata_v3")
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Use TITLEPAG_PALETTE and [3, 0, 2, 1] order as it's common for Wiz6 EGA
+    # Use TITLEPAG_PALETTE with standard plane order (confirmed correct for Wiz6 EGA)
     decoder = EGADecoder(palette=TITLEPAG_PALETTE)
-    order = [3, 0, 2, 1]
+    order = [0, 1, 2, 3]
     
     # Extract as 64x64 tiles
     tile_size = 2048 # 64x64x4/8

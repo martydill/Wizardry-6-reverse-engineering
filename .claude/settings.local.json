@@ -31,7 +31,15 @@
       "WebFetch(domain:www.myabandonware.com)",
       "Bash(file:*)",
       "Bash(xxd:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(set PYTHONPATH=%CD%)",
+      "Bash($env:PYTHONPATH=\"C:\\\\Users\\\\marty\\\\documents\\\\code\\\\bane\")",
+      "Bash(Select-Object -Last 20)",
+      "Bash(python3 -c:*)",
+      "WebFetch(domain:images.launchbox-app.com)",
+      "Bash(python3:*)",
+      "Bash(py:*)",
+      "Bash(grep:*)"
     ]
   }
 }

@@ -25,7 +25,16 @@ def dump_map(start_cell, w, h, column_major=True):
         print(line)
 
 if __name__ == "__main__":
-    # Assuming 20x20 maps
-    for m in range(2):
-        dump_map(m * 400, 20, 20, column_major=True)
-        print("-" * 20)
+    import sys
+    if len(sys.argv) < 4:
+        print("Usage: dump_map_ascii.py <start_cell> <w> <h> [col/row]")
+        sys.exit(1)
+    
+    start = int(sys.argv[1])
+    w = int(sys.argv[2])
+    h = int(sys.argv[3])
+    cm = True
+    if len(sys.argv) > 4 and sys.argv[4].lower() == 'row':
+        cm = False
+    
+    dump_map(start, w, h, column_major=cm)
