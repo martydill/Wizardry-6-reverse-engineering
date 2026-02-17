@@ -79,23 +79,27 @@ DEFAULT_16_PALETTE: list[tuple[int, int, int]] = [
 
 # Wizardry 6 TITLEPAG.EGA custom palette (extracted from reference screenshot)
 # Uses VGA DAC encoding: 6-bit values (0-63) × 4 = 8-bit (0, 84, 168, 252)
+# TITLEPAG.EGA (and likely all Wizardry 6 EGA images) uses a custom EGA palette
+# register mapping — derived by matching T16 color-index counts against the
+# reference screenshot's RGB pixel counts.  The game remaps the 16 EGA colors
+# into a non-standard index order.
 TITLEPAG_PALETTE: list[tuple[int, int, int]] = [
-    (  0,   0,   0),  # 0: Black
-    ( 84,  84,  84),  # 1: Dark gray
-    (168, 168, 168),  # 2: Light gray
-    (252, 252, 252),  # 3: White
-    (168,   0,   0),  # 4: Red
-    (168,  84,   0),  # 5: Brown
-    (252, 252,  84),  # 6: Yellow
-    ( 84, 252, 252),  # 7: Light cyan
-    (  0, 168,   0),  # 8: Green
-    (168,   0, 168),  # 9: Magenta
-    (252,  84, 252),  # 10: Light magenta
-    (252,  84,  84),  # 11: Light red
-    ( 84, 252,  84),  # 12: Light green
-    (  0,   0, 168),  # 13: Blue
-    (  0, 168, 168),  # 14: Cyan
-    ( 84,  84, 252),  # 15: Light blue
+    (  0,   0,   0),  # 0:  Black
+    (255, 255, 255),  # 1:  White
+    ( 85,  85, 255),  # 2:  Bright Blue
+    (255,  85, 255),  # 3:  Bright Magenta
+    (255,  85,  85),  # 4:  Bright Red
+    (255, 255,  85),  # 5:  Yellow
+    ( 85, 255,  85),  # 6:  Bright Green
+    ( 85, 255, 255),  # 7:  Bright Cyan
+    ( 85,  85,  85),  # 8:  Dark Gray
+    (170, 170, 170),  # 9:  Light Gray
+    (  0,   0, 170),  # 10: Blue
+    (170,   0, 170),  # 11: Magenta
+    (170,   0,   0),  # 12: Red
+    (170,  85,   0),  # 13: Brown
+    (  0, 170,   0),  # 14: Green
+    (  0, 170, 170),  # 15: Cyan
 ]
 
 
@@ -471,14 +475,13 @@ def decode_ega_file(path: str | Path) -> Sprite:
             plane_start = plane * 8192
             image_data.extend(data[plane_start : plane_start + bytes_per_plane_data])
 
-        # Wizardry 6 plane ordering found through testing
         return decoder.decode_planar(
             bytes(image_data),
             width=width,
             height=height,
             planes=4,
             msb_first=True,
-            plane_order=[3, 0, 2, 1],
+            plane_order=[0, 1, 2, 3],
         )
     elif len(data) == 4096 and "WPORT" in path.name.upper():
         # Character portrait collection
