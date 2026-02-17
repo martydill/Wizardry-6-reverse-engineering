@@ -1,7 +1,7 @@
 """Monster .PIC viewer — render Wizardry 6 monster images.
 
 Usage:
-    python -m tools.pic_viewer gamedata/MON00.PIC
+    python -m loaders.pic_viewer gamedata/MON00.PIC
 """
 
 from __future__ import annotations
@@ -11,16 +11,25 @@ from pathlib import Path
 
 import pygame
 
-from bane.data.pic_decoder import PIC_HEIGHT, PIC_WIDTH, decode_pic_file, decode_pic_frames
-from bane.data.sprite_decoder import DEFAULT_16_PALETTE
+from bane.data.pic_decoder import (
+    PIC_HEIGHT,
+    PIC_WIDTH,
+    decode_pic_file,
+    decode_pic_frames,
+)
+from bane.data.sprite_decoder import (
+    DEFAULT_16_PALETTE,
+    decode_ega_file,
+    decode_ega_frames,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="bane-pic",
-        description="View Wizardry 6 monster .PIC files",
+        description="View Wizardry 6 monster .PIC and .EGA files",
     )
-    parser.add_argument("file", type=Path, help="Path to .PIC file")
+    parser.add_argument("file", type=Path, help="Path to .PIC or .EGA file")
     parser.add_argument("--scale", type=int, default=2, help="Display scale factor")
     parser.add_argument("--width", type=int, default=PIC_WIDTH, help="Override width")
     parser.add_argument("--height", type=int, default=PIC_HEIGHT, help="Override height")
@@ -51,12 +60,12 @@ def main() -> None:
     parser.add_argument(
         "--msb-first",
         action="store_true",
-        help="Interpret tile bits MSB-first (default)",
+        help="Interpret bits MSB-first (default)",
     )
     parser.add_argument(
         "--lsb-first",
         action="store_true",
-        help="Interpret tile bits LSB-first",
+        help="Interpret bits LSB-first",
     )
     parser.add_argument(
         "--transparent",
@@ -71,25 +80,36 @@ def main() -> None:
         raise SystemExit("Choose only one of --msb-first or --lsb-first")
     msb_first = not args.lsb_first
 
-    frames = decode_pic_frames(
-        data=args.file.read_bytes(),
-        header_skip=args.header_skip,
-        msb_first=msb_first,
-    )
-    if frames:
-        frame_index = max(0, min(args.frame, len(frames) - 1))
-        sprite = frames[frame_index]
+    if args.file.suffix.lower() == ".ega":
+        frames = decode_ega_frames(args.file)
+        if frames:
+            frame_index = max(0, min(args.frame, len(frames) - 1))
+            sprite = frames[frame_index]
+        else:
+            sprite = decode_ega_file(args.file)
+            frames = [sprite]
+            frame_index = 0
     else:
-        frame_index = 0
-        frames = []
-        sprite = decode_pic_file(
-            str(args.file),
-            width=args.width,
-            height=args.height,
-            layout=args.layout,
+        # .PIC file handling
+        frames = decode_pic_frames(
+            data=args.file.read_bytes(),
             header_skip=args.header_skip,
-            plane_order=plane_order,
+            msb_first=msb_first,
         )
+        if frames:
+            frame_index = max(0, min(args.frame, len(frames) - 1))
+            sprite = frames[frame_index]
+        else:
+            frame_index = 0
+            frames = []
+            sprite = decode_pic_file(
+                str(args.file),
+                width=args.width,
+                height=args.height,
+                layout=args.layout,
+                header_skip=args.header_skip,
+                plane_order=plane_order,
+            )
 
     pygame.init()
     scale = max(1, args.scale)
@@ -107,10 +127,10 @@ def main() -> None:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif frames and event.key in (pygame.K_RIGHT, pygame.K_SPACE):
+                elif frames and len(frames) > 1 and event.key in (pygame.K_RIGHT, pygame.K_SPACE):
                     frame_index = (frame_index + 1) % len(frames)
                     sprite = frames[frame_index]
-                elif frames and event.key == pygame.K_LEFT:
+                elif frames and len(frames) > 1 and event.key == pygame.K_LEFT:
                     frame_index = (frame_index - 1) % len(frames)
                     sprite = frames[frame_index]
 
@@ -124,7 +144,7 @@ def main() -> None:
         y = (win_h - scaled.height) // 2
         screen.blit(surf, (x, y))
 
-        if frames:
+        if frames and len(frames) > 1:
             info = (
                 f"{args.file.name} frame {frame_index + 1}/{len(frames)} "
                 f"({sprite.width}x{sprite.height}) skip={args.header_skip}"
@@ -138,7 +158,7 @@ def main() -> None:
         screen.blit(text_surf, (10, 10))
 
         controls_text = "ESC: Quit"
-        if frames:
+        if frames and len(frames) > 1:
             controls_text += "  Left/Right/Space: Frame"
         controls = font.render(controls_text, True, (120, 120, 120))
         screen.blit(controls, (10, win_h - 30))

@@ -460,6 +460,8 @@ def decode_ega_file(path: str | Path) -> Sprite:
 
     if len(data) == 32768:
         # Full-screen sequential planar (e.g. TITLEPAG.EGA)
+        # Format: 4 planes × 8192 bytes = 32768 bytes (each plane is 8000 bytes + 192 padding)
+        # No embedded palette — use the known-good custom palette.
         decoder = EGADecoder(palette=TITLEPAG_PALETTE)
         width, height = 320, 200
         bytes_per_plane_data = width * height // 8  # 8000 bytes
@@ -521,7 +523,22 @@ def decode_ega_frames(path: str | Path) -> list[Sprite]:
     data = path.read_bytes()
     frames: list[Sprite] = []
 
-    if len(data) == 4096 and "WPORT" in path.name.upper():
+    if len(data) == 32768:
+        # Single full-screen image with 8192-byte plane stride (TITLEPAG, DRAGONSC, etc.)
+        frames.append(decode_ega_file(path))
+    elif len(data) >= 32000:
+        # MAZEDATA.EGA style: multiple sequential 32000-byte images, no palette header
+        offset = 0
+        while offset + 32000 <= len(data):
+            decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+            frames.append(decoder.decode_planar(
+                data[offset : offset + 32000],
+                width=320,
+                height=200,
+                msb_first=True
+            ))
+            offset += 32000
+    elif len(data) == 4096 and "WPORT" in path.name.upper():
         decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
         # 14 frames of 24x24 tiled planar (288 bytes each)
         for i in range(14):
@@ -558,8 +575,6 @@ def decode_ega_frames(path: str | Path) -> list[Sprite]:
                 for bit in range(7, -1, -1):
                     pixels.append(15 if (b & (1 << bit)) else 0)
             frames.append(Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette))
-    elif len(data) == 32768:
-        frames.append(decode_ega_file(path))
     
     return frames
 

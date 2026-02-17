@@ -46,6 +46,9 @@ def _decode_rle(data: bytes) -> bytes:
       * Byte with bit 7 clear (< 0x80): Read next N literal bytes
       * Byte with bit 7 set (>= 0x80): Repeat next byte (-N) times (two's complement)
         Example: 0xFF = -1 = repeat 1 time, 0xFE = -2 = repeat 2 times
+    
+    This implementation handles concatenated RLE streams by continuing to process
+    until the end of the input data.
     """
     out = bytearray()
     i = 0
@@ -55,8 +58,8 @@ def _decode_rle(data: bytes) -> bytes:
         i += 1
 
         if ctrl == 0x00:
-            # Terminator
-            break
+            # Terminator for one stream; continue to next if more data remains
+            continue
         elif (ctrl & 0x80) == 0x00:
             # Positive byte: read next N literal bytes
             count = ctrl
@@ -295,14 +298,10 @@ def decode_pic_bytes(
             height = max(1, total_pixels // 64)
 
     # Decode from tiled planar format
-    pixels = _decode_tiled_planar(payload, width, height, msb_first=True)
+    decoder = EGADecoder()
+    sprite = decoder.decode_tiled_planar(payload, width, height, msb_first=True)
 
-    return Sprite(
-        width=width,
-        height=height,
-        pixels=pixels,
-        palette=list(DEFAULT_16_PALETTE),
-    )
+    return sprite
 
 
 def decode_pic_file(
