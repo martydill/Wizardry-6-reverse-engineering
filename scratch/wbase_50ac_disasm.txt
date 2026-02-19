@@ -1,0 +1,30 @@
+50AC: push   bp
+50AD: mov    bp, sp
+50AF: add    sp, -6
+50B2: mov    word ptr [bp - 2], 0
+50B7: mov    word ptr [bp - 6], 0
+50BC: mov    word ptr [bp - 4], 0
+50C1: jmp    0x50db
+50C3: mov    ax, word ptr [bp - 4]
+50C6: shl    ax, 1
+50C8: mov    bx, ax
+50CA: mov    ax, word ptr [bx + 0x43d0]
+50CE: cmp    ax, word ptr [bp - 2]
+50D1: jne    0x50d8
+50D3: mov    word ptr [bp - 6], 1
+50D8: inc    word ptr [bp - 4]
+50DB: mov    ax, word ptr [bp - 4]
+50DE: cmp    ax, word ptr [bp + 4]
+50E1: jl     0x50c3
+50E3: cmp    word ptr [bp - 6], 0
+50E7: jne    0x50f0
+50E9: mov    ax, word ptr [bp - 2]
+50EC: mov    sp, bp
+50EE: pop    bp
+50EF: ret    
+50F0: inc    word ptr [bp - 2]
+50F3: mov    ax, word ptr [bp - 2]
+50F6: cmp    ax, 6
+50F9: jl     0x50b7
+50FB: mov    ax, 0
+50FE: jmp    0x50ec

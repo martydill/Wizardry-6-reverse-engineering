@@ -1,0 +1,44 @@
+7B5D: push   bp
+7B5E: mov    bp, sp
+7B60: mov    ax, word ptr [bp + 6]
+7B63: dec    ax
+7B64: push   ax
+7B65: push   word ptr [bp + 4]
+7B68: lea    ax, [bp + 0xc]
+7B6B: push   ax
+7B6C: lea    ax, [bp + 0xa]
+7B6F: push   ax
+7B70: lea    ax, [bp + 8]
+7B73: push   ax
+7B74: call   0x7a37
+7B77: add    sp, 0xa
+7B7A: test   ax, ax
+7B7C: je     0x7b98
+7B7E: cmp    word ptr [0x363c], 0xa
+7B83: je     0x7b91
+7B85: cmp    word ptr [0x363c], 0xc
+7B8A: je     0x7b91
+7B8C: mov    ax, 2
+7B8F: jmp    0x7b94
+7B91: mov    ax, 0
+7B94: mov    sp, bp
+7B96: pop    bp
+7B97: ret    
+7B98: mov    ax, 2
+7B9B: push   ax
+7B9C: mov    ax, word ptr [bp + 0xc]
+7B9F: mov    cx, 6
+7BA2: shl    ax, cl
+7BA4: mov    cx, word ptr [bp + 0xa]
+7BA7: shl    cx, 1
+7BA9: shl    cx, 1
+7BAB: shl    cx, 1
+7BAD: add    ax, cx
+7BAF: add    ax, word ptr [bp + 8]
+7BB2: push   ax
+7BB3: mov    ax, word ptr [0x4faa]
+7BB6: add    ax, 0x60
+7BB9: push   ax
+7BBA: call   0x2841
+7BBD: add    sp, 6
+7BC0: jmp    0x7b94

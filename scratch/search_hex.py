@@ -1,0 +1,16 @@
+import sys
+
+def search_hex(filename, hex_str):
+    with open(filename, 'rb') as f:
+        data = f.read()
+    
+    needle = bytes.fromhex(hex_str)
+    pos = -1
+    print(f"Searching for {needle.hex()} in {filename}")
+    while True:
+        pos = data.find(needle, pos + 1)
+        if pos == -1: break
+        print(f"  Found at file offset {pos:04x}")
+
+if __name__ == "__main__":
+    search_hex(sys.argv[1], sys.argv[2])

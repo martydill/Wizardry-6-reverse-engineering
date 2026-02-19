@@ -1,0 +1,114 @@
+53AA: push   bp
+53AB: mov    bp, sp
+53AD: mov    ax, word ptr [bp + 4]
+53B0: jmp    0x5437
+53B3: mov    ax, 2
+53B6: push   ax
+53B7: mov    ax, word ptr [bp + 6]
+53BA: mov    cx, 6
+53BD: shl    ax, cl
+53BF: mov    cx, word ptr [bp + 0xa]
+53C2: shl    cx, 1
+53C4: shl    cx, 1
+53C6: shl    cx, 1
+53C8: add    ax, cx
+53CA: add    ax, word ptr [bp + 8]
+53CD: push   ax
+53CE: mov    ax, word ptr [0x4faa]
+53D1: add    ax, 0x60
+53D4: push   ax
+53D5: call   0x2841
+53D8: add    sp, 6
+53DB: mov    sp, bp
+53DD: pop    bp
+53DE: ret    
+53DF: mov    ax, 2
+53E2: push   ax
+53E3: mov    ax, word ptr [bp + 6]
+53E6: mov    cx, 6
+53E9: shl    ax, cl
+53EB: mov    cx, word ptr [bp + 0xa]
+53EE: shl    cx, 1
+53F0: shl    cx, 1
+53F2: shl    cx, 1
+53F4: add    ax, cx
+53F6: add    ax, word ptr [bp + 8]
+53F9: push   ax
+53FA: mov    ax, word ptr [0x4faa]
+53FD: add    ax, 0x120
+5400: push   ax
+5401: call   0x2841
+5404: add    sp, 6
+5407: jmp    0x53db
+5409: push   word ptr [bp + 6]
+540C: push   word ptr [bp + 0xa]
+540F: push   word ptr [bp + 8]
+5412: push   word ptr [bp + 0xe]
+5415: push   word ptr [bp + 0xc]
+5418: call   0x7b5d
+541B: add    sp, 0xa
+541E: jmp    0x53db
+5420: push   word ptr [bp + 6]
+5423: push   word ptr [bp + 0xa]
+5426: push   word ptr [bp + 8]
+5429: push   word ptr [bp + 0xe]
+542C: push   word ptr [bp + 0xc]
+542F: call   0x7bc2
+5432: add    sp, 0xa
+5435: jmp    0x53db
+5437: cmp    ax, 0
+543A: jne    0x543f
+543C: jmp    0x53b3
+543F: cmp    ax, 1
+5442: je     0x53df
+5444: cmp    ax, 2
+5447: je     0x5409
+5449: cmp    ax, 3
+544C: je     0x5420
+544E: jmp    0x53db
+5450: push   bp
+5451: mov    bp, sp
+5453: add    sp, -2
+5456: mov    word ptr [0x4fc4], 0
+545C: mov    ax, 1
+545F: push   ax
+5460: call   0x255f
+5463: pop    cx
+5464: test   ax, ax
+5466: jne    0x54b1
+5468: push   word ptr [bp + 6]
+546B: call   0xaf4
+546E: pop    cx
+546F: mov    word ptr [bp - 2], ax
+5472: cmp    word ptr [0x3596], 1
+5477: jne    0x5484
+5479: mov    word ptr [0x4fc4], 1
+547F: dec    ax
+5480: mov    sp, bp
+5482: pop    bp
+5483: ret    
+5484: cmp    word ptr [0x5036], 0
+5489: jne    0x549e
+548B: mov    ax, word ptr [0x3646]
+548E: inc    ax
+548F: mov    cx, 2
+5492: cdq    
+5493: idiv   cx
+5495: mov    word ptr [0x3646], dx
+5499: call   0x97e7
+549C: jmp    0x54a1
+549E: call   0x4571
+54A1: mov    ax, word ptr [0x5036]
+54A4: inc    ax
+54A5: mov    cx, 0xa
+54A8: cdq    
+54A9: idiv   cx
+54AB: mov    word ptr [0x5036], dx
+54AF: jmp    0x545c
+54B1: mov    ax, 1
+54B4: push   ax
+54B5: call   0x2640
+54B8: pop    cx
+54B9: sub    ah, ah
+54BB: push   ax
+54BC: push   word ptr [bp + 4]

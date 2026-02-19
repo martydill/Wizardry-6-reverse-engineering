@@ -1,0 +1,124 @@
+74A1: push   bp
+74A2: mov    bp, sp
+74A4: add    sp, -0x54
+74A7: mov    ax, 0x13
+74AA: cmp    word ptr [bp + 6], 5
+74AE: jge    0x74b3
+74B0: mov    ax, 7
+74B3: mov    word ptr [bp - 2], ax
+74B6: mov    ax, 3
+74B9: cmp    word ptr [bp + 6], 1
+74BD: je     0x74cb
+74BF: mov    ax, 0x14
+74C2: cmp    word ptr [bp + 6], 5
+74C6: jge    0x74cb
+74C8: mov    ax, 0xa
+74CB: mov    word ptr [bp - 4], ax
+74CE: push   word ptr [bp + 8]
+74D1: add    ax, word ptr [bp - 2]
+74D4: dec    ax
+74D5: push   ax
+74D6: push   word ptr [bp + 8]
+74D9: push   word ptr [bp - 2]
+74DC: push   word ptr [bp + 4]
+74DF: call   0x25b
+74E2: add    sp, 0xa
+74E5: mov    ax, word ptr [bp + 6]
+74E8: jmp    0x7593
+74EB: lea    ax, [bp - 0x54]
+74EE: push   ax
+74EF: mov    al, byte ptr [0x3590]
+74F2: sub    ah, ah
+74F4: add    ax, 0x92e
+74F7: push   ax
+74F8: call   0x677
+74FB: add    sp, 4
+74FE: jmp    0x75a0
+7501: lea    ax, [bp - 0x54]
+7504: push   ax
+7505: mov    al, byte ptr [0x3591]
+7508: sub    ah, ah
+750A: push   ax
+750B: call   0x40d
+750E: add    sp, 4
+7511: jmp    0x75a0
+7514: lea    ax, [bp - 0x54]
+7517: push   ax
+7518: mov    al, byte ptr [0x3593]
+751B: sub    ah, ah
+751D: add    ax, 0x935
+7520: push   ax
+7521: call   0x677
+7524: add    sp, 4
+7527: jmp    0x75a0
+7529: lea    ax, [bp - 0x54]
+752C: push   ax
+752D: mov    al, byte ptr [0x3594]
+7530: sub    ah, ah
+7532: add    ax, 0x938
+7535: push   ax
+7536: call   0x677
+7539: add    sp, 4
+753C: jmp    0x75a0
+753E: lea    ax, [bp - 0x54]
+7541: push   ax
+7542: mov    al, byte ptr [0x3595]
+7545: sub    ah, ah
+7547: add    ax, 0x93b
+754A: push   ax
+754B: call   0x677
+754E: add    sp, 4
+7551: jmp    0x75a0
+7553: mov    ax, 0x357c
+7556: push   ax
+7557: lea    ax, [bp - 0x54]
+755A: push   ax
+755B: call   0x382a
+755E: add    sp, 4
+7561: jmp    0x75a0
+7563: mov    ax, 0x3540
+7566: push   ax
+7567: lea    ax, [bp - 0x54]
+756A: push   ax
+756B: call   0x382a
+756E: add    sp, 4
+7571: jmp    0x75a0
+7573: mov    ax, 0x3554
+7576: push   ax
+7577: lea    ax, [bp - 0x54]
+757A: push   ax
+757B: call   0x382a
+757E: add    sp, 4
+7581: jmp    0x75a0
+7583: iret   
+7584: jne    0x756b
+7586: jne    0x7580
+7588: jne    0x7597
+758A: jbe    0x75ae
+758C: jbe    0x75c5
+758E: jbe    0x75d7
+7590: jbe    0x75e9
+7592: jbe    0x75d1
+7594: or     byte ptr [bx + si], al
+7596: jae    0x75a0
+7598: xchg   bx, ax
+7599: shl    bx, 1
+759B: jmp    word ptr cs:[bx + 0x7667]
+75A0: cmp    byte ptr [bp - 0x54], 0
+75A4: jne    0x75ae
+75A6: mov    byte ptr [bp - 0x54], 0x20
+75AA: mov    byte ptr [bp - 0x53], 0
+75AE: push   word ptr [bp + 8]
+75B1: push   word ptr [bp - 2]
+75B4: push   word ptr [bp + 4]
+75B7: call   0x227
+75BA: add    sp, 6
+75BD: push   word ptr [bp + 0xa]
+75C0: lea    ax, [bp - 0x54]
+75C3: push   ax
+75C4: push   word ptr [bp + 4]
+75C7: call   0x2405
+75CA: add    sp, 6
+75CD: mov    sp, bp
+75CF: pop    bp
+75D0: ret    

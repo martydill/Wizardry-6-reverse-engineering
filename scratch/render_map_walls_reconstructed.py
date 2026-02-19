@@ -14,6 +14,9 @@ MOD_PATH = Path("gamedata/NEWGAME.DBS")
 # - per-entry read sizes: 0x3304 + 0x3306 = 0x0C0E
 MAP_HEADER_SIZE = 0x019E
 MAP_RECORD_SIZE = 0x0C0E
+FEATURE_OFFSET_IN_RECORD = 0x02F8
+FEATURE_SIZE = 0x80  # 16x16 @ 4-bit
+FEATURE_GRID_OFFSETS = (0x01F8, 0x0278, 0x02F8)
 
 
 def load(path: Path) -> bytes:
@@ -49,6 +52,103 @@ def decode_origins(data: bytes, base: int):
     xs = list(data[base + 0x1E0 : base + 0x1E0 + 12])
     ys = list(data[base + 0x1EC : base + 0x1EC + 12])
     return list(zip(xs, ys))
+
+
+def decode_feature_grid(data: bytes, base: int, offset_in_record: int):
+    """Decode 16x16 4-bit feature map (8x8 quadrants, row-major per quadrant)."""
+    f = data[base + offset_in_record : base + offset_in_record + FEATURE_SIZE]
+    grid = [[0 for _ in range(16)] for _ in range(16)]
+    bytes_per_q = 32
+    for qy in range(2):
+        for qx in range(2):
+            q_idx = qy * 2 + qx
+            q_base = q_idx * bytes_per_q
+            for ly in range(8):
+                for lx in range(8):
+                    local_idx = ly * 8 + lx
+                    b = f[q_base + (local_idx // 2)]
+                    val = (b & 0x0F) if (local_idx % 2 == 0) else ((b >> 4) & 0x0F)
+                    gx = qx * 8 + lx
+                    gy = qy * 8 + ly
+                    grid[gy][gx] = val
+    return grid
+
+
+FEATURE_COLORS = {
+    0x1: (120, 210, 255),  # stairs up
+    0x2: (90, 160, 255),   # stairs down
+    0x3: (255, 120, 0),    # sconce
+    0x4: (0, 220, 220),    # fountain
+    0x5: (255, 60, 160),   # secret button
+    0x6: (230, 230, 0),    # pressure plate
+    0x7: (0, 200, 80),     # portcullis
+    0x8: (180, 180, 255),  # shackles
+    0x9: (140, 90, 255),   # niche
+    0xA: (40, 120, 255),
+    0xB: (255, 40, 40),
+    0xC: (220, 220, 220),
+    0xD: (0, 140, 255),
+    0xE: (220, 0, 0),
+    0xF: (200, 200, 255),
+}
+
+
+def draw_world_features(screen, ox, oy, cell, world_features, origins, flip_x=False, flip_y=False):
+    min_x, min_y, max_x, max_y = stitched_bounds(origins)
+    surf_w = max(1, (max_x - min_x) * cell)
+    surf_h = max(1, (max_y - min_y) * cell)
+    tmp = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+
+    for wx, wy, v in world_features:
+        px = (wx - min_x) * cell
+        py = (wy - min_y) * cell
+        c = FEATURE_COLORS.get(v, (255, 255, 255))
+        pygame.draw.rect(tmp, c, (px + 1, py + 1, max(1, cell - 2), max(1, cell - 2)))
+
+    if flip_x or flip_y:
+        tmp = pygame.transform.flip(tmp, flip_x, flip_y)
+    screen.blit(tmp, (ox, oy))
+
+
+def draw_block_features(screen, ox, oy, cell, block_features):
+    for lx, ly, v in block_features:
+        px = ox + lx * cell
+        py = oy + ly * cell
+        c = FEATURE_COLORS.get(v, (255, 255, 255))
+        pygame.draw.rect(screen, c, (px + 1, py + 1, max(1, cell - 2), max(1, cell - 2)))
+
+
+def decode_features_by_block(data: bytes, base: int, origins):
+    """Decode feature banks and map them directly into per-block and world cells.
+
+    Bank layout:
+    - +0x1F8 -> blocks 0..3
+    - +0x278 -> blocks 4..7
+    - +0x2F8 -> blocks 8..11
+    """
+    per_block = {b: [] for b in range(12)}
+    world = []
+
+    for bank_idx, off in enumerate(FEATURE_GRID_OFFSETS):
+        grid = decode_feature_grid(data, base, off)
+        for q in range(4):
+            block = bank_idx * 4 + q
+            if block >= 12 or not block_enabled(origins, block):
+                continue
+            qx = q % 2
+            qy = q // 2
+            bx, by = origins[block]
+            for ly in range(8):
+                gy = qy * 8 + ly
+                for lx in range(8):
+                    gx = qx * 8 + lx
+                    v = grid[gy][gx]
+                    if v == 0:
+                        continue
+                    per_block[block].append((lx, ly, v))
+                    world.append((bx + lx, by + ly, v))
+
+    return per_block, world
 
 
 def resolve_world_cell(origins, wx, wy, prefer_block=None):
@@ -221,8 +321,43 @@ def collect_world_edge_values(a_vals, b_vals, origins, map_id):
     return out
 
 
+def collect_block_edge_values(a_vals, b_vals, origins, map_id):
+    out = {b: [] for b in range(12)}
+    for b, _ in enumerate(origins):
+        if not block_enabled(origins, b):
+            continue
+        for y in range(9):
+            for x in range(8):
+                if y == 0:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, 0, x, 2)
+                else:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, y - 1, x, 0)
+                if val:
+                    out[b].append(("h", x, y, val))
+        for y in range(8):
+            for x in range(9):
+                if x == 0:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, y, 0, 3)
+                else:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, y, x - 1, 1)
+                if val:
+                    out[b].append(("v", x, y, val))
+    return out
+
+
 def draw_edge_markers(
-    screen, ox, oy, cell, edge_vals, origins, color, radius=2, value_filter=(1, 3), flip_x=False, flip_y=False
+    screen,
+    ox,
+    oy,
+    cell,
+    edge_vals,
+    origins,
+    color,
+    radius=2,
+    value_filter=(1, 3),
+    flip_x=False,
+    flip_y=False,
+    shape="circle",
 ):
     min_x, min_y, max_x, max_y = stitched_bounds(origins)
     surf_w = max(1, (max_x - min_x) * cell)
@@ -238,11 +373,32 @@ def draw_edge_markers(
             cx, cy = px + (cell // 2), py
         else:
             cx, cy = px, py + (cell // 2)
-        pygame.draw.circle(tmp, color, (cx, cy), radius)
+        if shape == "square":
+            d = radius * 2
+            pygame.draw.rect(tmp, color, (cx - radius, cy - radius, d, d))
+        else:
+            pygame.draw.circle(tmp, color, (cx, cy), radius)
 
     if flip_x or flip_y:
         tmp = pygame.transform.flip(tmp, flip_x, flip_y)
     screen.blit(tmp, (ox, oy))
+
+
+def draw_block_edge_markers(screen, ox, oy, cell, block_edge_vals, color, radius=3, value_filter=(1,), shape="square"):
+    for kind, x, y, val in block_edge_vals:
+        if val not in value_filter:
+            continue
+        px = ox + x * cell
+        py = oy + y * cell
+        if kind == "h":
+            cx, cy = px + (cell // 2), py
+        else:
+            cx, cy = px, py + (cell // 2)
+        if shape == "square":
+            d = radius * 2
+            pygame.draw.rect(screen, color, (cx - radius, cy - radius, d, d))
+        else:
+            pygame.draw.circle(screen, color, (cx, cy), radius)
 
 
 def main():
@@ -261,6 +417,7 @@ def main():
         orig_a, orig_b = decode_wall_planes(orig, base)
         mod_a, mod_b = decode_wall_planes(mod, base)
         origins = decode_origins(mod, base)
+        feature_by_block, world_features = decode_features_by_block(mod, base, origins)
         orig_bounds = {}
         mod_bounds = {}
         for b in range(12):
@@ -268,10 +425,31 @@ def main():
             mod_bounds[b] = build_mode_boundaries(mod_a, mod_b, origins, map_id, b)
         orig_edge_vals = collect_world_edge_values(orig_a, orig_b, origins, map_id)
         mod_edge_vals = collect_world_edge_values(mod_a, mod_b, origins, map_id)
-        return base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals
+        mod_block_edge_vals = collect_block_edge_values(mod_a, mod_b, origins, map_id)
+        return (
+            base,
+            origins,
+            orig_bounds,
+            mod_bounds,
+            orig_edge_vals,
+            mod_edge_vals,
+            mod_block_edge_vals,
+            feature_by_block,
+            world_features,
+        )
 
     map_id = max(0, min(args.map_id, max_maps - 1))
-    base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals = decode_for(map_id)
+    (
+        base,
+        origins,
+        orig_bounds,
+        mod_bounds,
+        orig_edge_vals,
+        mod_edge_vals,
+        mod_block_edge_vals,
+        feature_by_block,
+        world_features,
+    ) = decode_for(map_id)
 
     pygame.init()
     screen = pygame.display.set_mode((1700, 980))
@@ -295,10 +473,30 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
                 map_id = (map_id + 1) % max_maps
-                base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals = decode_for(map_id)
+                (
+                    base,
+                    origins,
+                    orig_bounds,
+                    mod_bounds,
+                    orig_edge_vals,
+                    mod_edge_vals,
+                    mod_block_edge_vals,
+                    feature_by_block,
+                    world_features,
+                ) = decode_for(map_id)
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
                 map_id = (map_id - 1) % max_maps
-                base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals = decode_for(map_id)
+                (
+                    base,
+                    origins,
+                    orig_bounds,
+                    mod_bounds,
+                    orig_edge_vals,
+                    mod_edge_vals,
+                    mod_block_edge_vals,
+                    feature_by_block,
+                    world_features,
+                ) = decode_for(map_id)
 
         screen.fill((20, 20, 24))
 
@@ -312,7 +510,30 @@ def main():
             lab = f"B{b} ({origins[b][0]},{origins[b][1]})"
             screen.blit(font.render(lab, True, (180, 180, 190)), (px, py - 18))
             draw_block_panel(screen, px, py, panel_cell, orig_bounds[b], (100, 110, 140), 1)
+            draw_block_features(screen, px, py, panel_cell, feature_by_block.get(b, []))
             draw_block_panel(screen, px, py, panel_cell, mod_bounds[b], (230, 235, 245), 2)
+            draw_block_edge_markers(
+                screen,
+                px,
+                py,
+                panel_cell,
+                mod_block_edge_vals.get(b, []),
+                (170, 120, 60),
+                radius=3,
+                value_filter=(3,),
+                shape="circle",
+            )
+            draw_block_edge_markers(
+                screen,
+                px,
+                py,
+                panel_cell,
+                mod_block_edge_vals.get(b, []),
+                (80, 180, 220),
+                radius=3,
+                value_filter=(1,),
+                shape="square",
+            )
 
         # Stitched composite.
         stitched_cell = 8
@@ -347,10 +568,11 @@ def main():
             stitched_cell,
             mod_edge_vals,
             origins,
-            (80, 180, 220),
-            radius=2,
-            value_filter=(1,),
+            (170, 120, 60),
+            radius=3,
+            value_filter=(3,),
             flip_y=True,
+            shape="circle",
         )
         draw_edge_markers(
             screen,
@@ -359,16 +581,18 @@ def main():
             stitched_cell,
             mod_edge_vals,
             origins,
-            (170, 120, 60),
-            radius=2,
-            value_filter=(3,),
+            (80, 180, 220),
+            radius=3,
+            value_filter=(1,),
             flip_y=True,
+            shape="square",
         )
+        draw_world_features(screen, st_x, st_y, stitched_cell, world_features, origins, flip_y=True)
 
         lines = [
             f"Map {map_id} reconstructed from base=0x{base:X} (record stride 0x{MAP_RECORD_SIZE:X})",
             "Walls: mode-resolved 2-bit planes (+0x60/+0x120), stitched by +0x1E0/+0x1EC origin tables",
-            f"Blue=original, White=modified, Red=added, Cyan=passages(v=1), Brown=doors(v=3), Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
+            f"Blue=original, White=modified, Red=added, Brown circles=doors(v=3), Cyan squares=passages(v=1), Filled cells=map features, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
         ]
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 225)), (24, 20 + i * 18))

@@ -1,0 +1,331 @@
+2200: jmp    0x1dc1
+2203: push   bp
+2204: mov    bp, sp
+2206: add    sp, -0x52
+2209: mov    word ptr [0x4f88], 0
+220F: push   word ptr [0x4fb6]
+2213: call   0xfffff5e2
+2216: pop    cx
+2217: mov    word ptr [bp - 2], 0
+221C: push   word ptr [bp - 2]
+221F: mov    ax, 0x13
+2222: push   ax
+2223: push   word ptr [0x4fb6]
+2227: call   0xffffc7d5
+222A: add    sp, 6
+222D: mov    ax, 3
+2230: push   ax
+2231: mov    ax, 0x1b
+2234: push   ax
+2235: push   word ptr [0x4fb6]
+2239: call   0xffffe8ad
+223C: add    sp, 6
+223F: inc    word ptr [bp - 2]
+2242: mov    ax, word ptr [bp - 2]
+2245: cmp    ax, 5
+2248: jl     0x221c
+224A: push   word ptr [0x4fb6]
+224E: call   0xfffff69b
+2251: pop    cx
+2252: mov    ax, 0
+2255: push   ax
+2256: push   word ptr [0x3342]
+225A: call   0xffffcec5
+225D: add    sp, 4
+2260: mov    ax, 0
+2263: push   ax
+2264: push   word ptr [0x4fb2]
+2268: call   0xffffcf0c
+226B: add    sp, 4
+226E: mov    ax, 0
+2271: push   ax
+2272: push   ax
+2273: mov    ax, 0xffff
+2276: push   ax
+2277: mov    ax, 8
+227A: push   ax
+227B: mov    ax, 5
+227E: push   ax
+227F: mov    ax, 0x14
+2282: push   ax
+2283: mov    ax, 0x13
+2286: push   ax
+2287: mov    ax, 0x14
+228A: push   ax
+228B: call   0xffffc5e4
+228E: add    sp, 0x10
+2291: mov    word ptr [0x4fb0], ax
+2294: mov    ax, 0
+2297: push   ax
+2298: mov    ax, 3
+229B: push   ax
+229C: mov    ax, 0x20
+229F: push   ax
+22A0: push   word ptr [0x4fb0]
+22A4: call   0xfffff788
+22A7: add    sp, 8
+22AA: push   word ptr [0x4fb0]
+22AE: call   0xfffff5e2
+22B1: pop    cx
+22B2: cmp    word ptr [0x4f88], 0
+22B7: je     0x22bc
+22B9: jmp    0x233a
+22BC: mov    ax, 8
+22BF: push   ax
+22C0: mov    ax, 7
+22C3: push   ax
+22C4: mov    ax, 6
+22C7: push   ax
+22C8: mov    ax, 5
+22CB: push   ax
+22CC: mov    ax, 1
+22CF: push   ax
+22D0: mov    ax, 0xd
+22D3: push   ax
+22D4: push   word ptr [0x4fb0]
+22D8: call   0xf8c
+22DB: add    sp, 0xe
+22DE: mov    ax, 0xe
+22E1: push   ax
+22E2: mov    ax, 3
+22E5: push   ax
+22E6: mov    ax, 0xd
+22E9: push   ax
+22EA: mov    ax, 1
+22ED: push   ax
+22EE: mov    ax, 3
+22F1: push   ax
+22F2: mov    ax, 0xa
+22F5: push   ax
+22F6: push   word ptr [0x4fb0]
+22FA: call   0xf8c
+22FD: add    sp, 0xe
+2300: mov    ax, 0x11
+2303: push   ax
+2304: mov    ax, 3
+2307: push   ax
+2308: mov    ax, 0xc
+230B: push   ax
+230C: push   word ptr [0x4fb0]
+2310: call   0xfff
+2313: add    sp, 8
+2316: mov    ax, 0xc
+2319: push   ax
+231A: mov    ax, 0x10
+231D: push   ax
+231E: mov    ax, 0xa
+2321: push   ax
+2322: mov    ax, 0xf
+2325: push   ax
+2326: mov    ax, 3
+2329: push   ax
+232A: mov    ax, 0x10
+232D: push   ax
+232E: push   word ptr [0x4fb0]
+2332: call   0xf8c
+2335: add    sp, 0xe
+2338: jmp    0x23b6
+233A: mov    ax, 8
+233D: push   ax
+233E: mov    ax, 7
+2341: push   ax
+2342: mov    ax, 6
+2345: push   ax
+2346: mov    ax, 5
+2349: push   ax
+234A: mov    ax, 1
+234D: push   ax
+234E: mov    ax, 0xd
+2351: push   ax
+2352: push   word ptr [0x4fb0]
+2356: call   0xf8c
+2359: add    sp, 0xe
+235C: mov    ax, 4
+235F: push   ax
+2360: mov    ax, 3
+2363: push   ax
+2364: mov    ax, 2
+2367: push   ax
+2368: mov    ax, 1
+236B: push   ax
+236C: mov    ax, 3
+236F: push   ax
+2370: mov    ax, 0xa
+2373: push   ax
+2374: push   word ptr [0x4fb0]
+2378: call   0xf8c
+237B: add    sp, 0xe
+237E: mov    ax, 0x19
+2381: push   ax
+2382: mov    ax, 3
+2385: push   ax
+2386: mov    ax, 0xc
+2389: push   ax
+238A: push   word ptr [0x4fb0]
+238E: call   0xfff
+2391: add    sp, 8
+2394: mov    ax, 0xc
+2397: push   ax
+2398: mov    ax, 0xb
+239B: push   ax
+239C: mov    ax, 0xa
+239F: push   ax
+23A0: mov    ax, 9
+23A3: push   ax
+23A4: mov    ax, 3
+23A7: push   ax
+23A8: mov    ax, 0x10
+23AB: push   ax
+23AC: push   word ptr [0x4fb0]
+23B0: call   0xf8c
+23B3: add    sp, 0xe
+23B6: mov    word ptr [bp - 2], 0
+23BB: mov    ax, word ptr [bp - 2]
+23BE: inc    ax
+23BF: push   ax
+23C0: mov    ax, 1
+23C3: push   ax
+23C4: push   word ptr [0x4fb0]
+23C8: call   0xffffc7d5
+23CB: add    sp, 6
+23CE: mov    ax, 0x12
+23D1: push   ax
+23D2: push   word ptr [0x4fb0]
+23D6: mov    ax, word ptr [bp - 2]
+23D9: add    ax, 0x514
+23DC: push   ax
+23DD: call   0xffffcd09
+23E0: add    sp, 6
+23E3: inc    word ptr [bp - 2]
+23E6: mov    ax, word ptr [bp - 2]
+23E9: cmp    ax, 4
+23EC: jl     0x23bb
+23EE: push   word ptr [0x4fb0]
+23F2: call   0xfffff69b
+23F5: pop    cx
+23F6: mov    ax, 0
+23F9: push   ax
+23FA: mov    ax, 8
+23FD: push   ax
+23FE: mov    ax, 0x4ee0
+2401: push   ax
+2402: call   0xfffffd7a
+2405: add    sp, 6
+2408: mov    word ptr [0x4f86], 0
+240E: mov    word ptr [0x4faa], 0
+2414: mov    word ptr [0x4fa8], 0
+241A: mov    word ptr [bp - 2], 0
+241F: mov    bx, word ptr [bp - 2]
+2422: mov    byte ptr [bx + 0x4330], 0xff
+2427: mov    byte ptr [bx + 0x4326], 0
+242C: inc    word ptr [bp - 2]
+242F: mov    ax, word ptr [bp - 2]
+2432: cmp    ax, 3
+2435: jl     0x241f
+2437: mov    sp, bp
+2439: pop    bp
+243A: ret    
+243B: push   bp
+243C: mov    bp, sp
+243E: call   0x1909
+2441: cmp    ax, 0xffff
+2444: jne    0x2453
+2446: call   0x34b1
+2449: mov    word ptr [0x363a], 3
+244F: mov    sp, bp
+2451: pop    bp
+2452: ret    
+2453: push   word ptr [bp + 4]
+2456: call   0x1bd4
+2459: pop    cx
+245A: cmp    ax, 0xffff
+245D: jne    0x2461
+245F: jmp    0x244f
+2461: push   word ptr [0x363c]
+2465: mov    ax, 0
+2468: push   ax
+2469: call   0xffffd5ee
+246C: add    sp, 4
+246F: call   0x2203
+2472: mov    word ptr [0x363a], 6
+2478: jmp    0x244f
+247A: push   bp
+247B: mov    bp, sp
+247D: add    sp, -6
+2480: mov    ax, word ptr [bp + 0xa]
+2483: mov    bx, 0x64
+2486: imul   bx
+2488: push   ax
+2489: push   dx
+248A: mov    ax, word ptr [bp + 0xc]
+248D: cdq    
+248E: mov    cx, ax
+2490: mov    bx, dx
+2492: pop    dx
+2493: pop    ax
+2494: call   0x3e8
+2497: mov    cx, 0xa
+249A: mov    bx, 0
+249D: call   0x3e8
+24A0: inc    ax
+24A1: mov    word ptr [bp - 2], ax
+24A4: cmp    ax, 0xa
+24A7: jle    0x24ae
+24A9: mov    word ptr [bp - 2], 0xa
+24AE: cmp    word ptr [bp + 0xa], 0
+24B2: jne    0x24b9
+24B4: mov    word ptr [bp - 2], 0
+24B9: mov    ax, word ptr [bp + 0xe]
+24BC: add    ax, 9
+24BF: mov    byte ptr [bp - 5], al
+24C2: mov    ax, word ptr [bp + 0xe]
+24C5: add    ax, 4
+24C8: mov    byte ptr [bp - 4], al
+24CB: mov    al, byte ptr [bp + 0xe]
+24CE: mov    byte ptr [bp - 3], al
+24D1: cmp    word ptr [bp - 2], 3
+24D5: jg     0x24e2
+24D7: mov    ax, word ptr [bp + 0xe]
+24DA: add    ax, word ptr [bp - 2]
+24DD: mov    byte ptr [bp - 3], al
+24E0: jmp    0x251c
+24E2: mov    ax, word ptr [bp + 0xe]
+24E5: inc    ax
+24E6: inc    ax
+24E7: inc    ax
+24E8: mov    byte ptr [bp - 3], al
+24EB: add    word ptr [bp - 2], -3
+24EF: cmp    word ptr [bp - 2], 4
+24F3: jg     0x2503
+24F5: mov    ax, word ptr [bp + 0xe]
+24F8: add    ax, word ptr [bp - 2]
+24FB: add    ax, 4
+24FE: mov    byte ptr [bp - 4], al
+2501: jmp    0x251c
+2503: mov    ax, word ptr [bp + 0xe]
+2506: add    ax, 8
+2509: mov    byte ptr [bp - 4], al
+250C: add    word ptr [bp - 2], -4
+2510: mov    ax, word ptr [bp + 0xe]
+2513: add    ax, word ptr [bp - 2]
+2516: add    ax, 9
+2519: mov    byte ptr [bp - 5], al
+251C: mov    word ptr [bp - 2], 0
+2521: mov    ax, word ptr [bp + 8]
+2524: add    ax, word ptr [bp - 2]
+2527: push   ax
+2528: push   word ptr [bp + 6]
+252B: push   word ptr [bp + 4]
+252E: call   0xffffc7d5
+2531: add    sp, 6
+2534: mov    ax, 1
+2537: push   ax
+2538: mov    bx, word ptr [bp - 2]
+253B: add    bx, bp
+253D: mov    al, byte ptr [bx - 5]
+2540: sub    ah, ah
+2542: push   ax
+2543: push   word ptr [bp + 4]
+2546: call   0xffffe8ad
+2549: add    sp, 6
+254C: inc    word ptr [bp - 2]

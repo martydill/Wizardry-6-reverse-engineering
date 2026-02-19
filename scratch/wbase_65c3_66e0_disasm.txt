@@ -1,0 +1,117 @@
+65C3: push   bp
+65C4: mov    bp, sp
+65C6: add    sp, 0xfde8
+65CA: mov    word ptr [bp - 8], 0
+65CF: mov    word ptr [bp - 6], 0
+65D4: jmp    0x6637
+65D6: mov    bx, word ptr [bp - 6]
+65D9: cmp    byte ptr [bx + 0x4fd8], 1
+65DE: jne    0x6634
+65E0: mov    ax, 0
+65E3: push   ax
+65E4: push   bx
+65E5: lea    ax, [bp - 0x1bc]
+65E9: push   ax
+65EA: call   0x44b6
+65ED: add    sp, 6
+65F0: lea    ax, [bp - 0x1bc]
+65F4: push   ax
+65F5: mov    ax, word ptr [bp - 8]
+65F8: shl    ax, 1
+65FA: shl    ax, 1
+65FC: shl    ax, 1
+65FE: add    ax, 0x507a
+6601: push   ax
+6602: call   0x382a
+6605: add    sp, 4
+6608: mov    al, byte ptr [bp - 0x1e]
+660B: sub    ah, ah
+660D: mov    cx, word ptr [bp - 8]
+6610: shl    cx, 1
+6612: mov    bx, cx
+6614: mov    word ptr [bx + 0x50fa], ax
+6618: mov    al, byte ptr [bp - 0x1f]
+661B: sub    ah, ah
+661D: mov    word ptr [bx + 0x511a], ax
+6621: mov    al, byte ptr [bp - 0x1d]
+6624: sub    ah, ah
+6626: mov    word ptr [bx + 0x513a], ax
+662A: mov    ax, word ptr [bp - 6]
+662D: mov    word ptr [bx + 0x515a], ax
+6631: inc    word ptr [bp - 8]
+6634: inc    word ptr [bp - 6]
+6637: mov    ax, word ptr [bp - 6]
+663A: cmp    ax, word ptr [0x4fd2]
+663E: jl     0x65d6
+6640: cmp    word ptr [bp - 8], 0
+6644: jne    0x664d
+6646: mov    ax, 0xffff
+6649: mov    sp, bp
+664B: pop    bp
+664C: ret    
+664D: mov    ax, word ptr [bp - 8]
+6650: mov    word ptr [bp - 0x1be], ax
+6654: mov    ax, 0
+6657: push   ax
+6658: push   ax
+6659: mov    ax, 0xfffc
+665C: push   ax
+665D: mov    ax, 0xa
+6660: push   ax
+6661: mov    ax, 5
+6664: push   ax
+6665: mov    ax, 0x13
+6668: push   ax
+6669: push   ax
+666A: mov    ax, 0
+666D: push   ax
+666E: call   0x36
+6671: add    sp, 0x10
+6674: mov    word ptr [bp - 2], ax
+6677: mov    ax, 0
+667A: push   ax
+667B: mov    ax, 3
+667E: push   ax
+667F: mov    ax, 0x20
+6682: push   ax
+6683: push   word ptr [bp - 2]
+6686: call   0x31da
+6689: add    sp, 8
+668C: mov    ax, 0
+668F: push   ax
+6690: push   ax
+6691: mov    ax, 0xfffb
+6694: push   ax
+6695: mov    ax, 0x14
+6698: push   ax
+6699: mov    ax, 5
+669C: push   ax
+669D: mov    ax, 0x14
+66A0: push   ax
+66A1: mov    ax, 0x13
+66A4: push   ax
+66A5: mov    ax, 0x14
+66A8: push   ax
+66A9: call   0x36
+66AC: add    sp, 0x10
+66AF: mov    word ptr [bp - 4], ax
+66B2: mov    ax, 0
+66B5: push   ax
+66B6: mov    ax, 3
+66B9: push   ax
+66BA: mov    ax, 0x20
+66BD: push   ax
+66BE: push   word ptr [bp - 4]
+66C1: call   0x31da
+66C4: add    sp, 8
+66C7: lea    ax, [bp - 0x20e]
+66CB: push   ax
+66CC: mov    ax, 0x4b1
+66CF: push   ax
+66D0: call   0x677
+66D3: add    sp, 4
+66D6: lea    ax, [bp - 0x20e]
+66DA: push   ax
+66DB: call   0x3f2b
+66DE: pop    cx
+66DF: inc    ax

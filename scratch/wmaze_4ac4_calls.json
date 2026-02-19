@@ -1,0 +1,264 @@
+{
+  "window": {
+    "start": "0x4AC4",
+    "end": "0x4DA5"
+  },
+  "draw_calls": [
+    {
+      "callsite": "0x4AFF",
+      "target": "0x227",
+      "context": [
+        "4AE6: mov    word ptr [bp - 4], 0",
+        "4AEB: mov    ax, word ptr [bp + 4]",
+        "4AEE: cdq    ",
+        "4AEF: idiv   cx",
+        "4AF1: shl    ax, 1",
+        "4AF3: shl    ax, 1",
+        "4AF5: mov    word ptr [bp - 6], ax",
+        "4AF8: push   ax",
+        "4AF9: push   word ptr [bp - 4]",
+        "4AFC: push   word ptr [bp - 0x58]",
+        "4AFF: call   0x227"
+      ]
+    },
+    {
+      "callsite": "0x4B16",
+      "target": "0x2439",
+      "context": [
+        "4AFC: push   word ptr [bp - 0x58]",
+        "4AFF: call   0x227",
+        "4B02: add    sp, 6",
+        "4B05: mov    ax, 3",
+        "4B08: push   ax",
+        "4B09: mov    ax, 0x1b0",
+        "4B0C: imul   word ptr [bp + 4]",
+        "4B0F: add    ax, 0x43e8",
+        "4B12: push   ax",
+        "4B13: push   word ptr [bp - 0x58]",
+        "4B16: call   0x2439"
+      ]
+    },
+    {
+      "callsite": "0x4B39",
+      "target": "0x22ff",
+      "context": [
+        "4B25: push   ax",
+        "4B26: call   0x3f2b",
+        "4B29: pop    cx",
+        "4B2A: mov    si, ax",
+        "4B2C: jmp    0x4b40",
+        "4B2E: mov    ax, 3",
+        "4B31: push   ax",
+        "4B32: mov    ax, 0x20",
+        "4B35: push   ax",
+        "4B36: push   word ptr [bp - 0x58]",
+        "4B39: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4B6E",
+      "target": "0x227",
+      "context": [
+        "4B56: add    ax, dx",
+        "4B58: add    ax, 0x48",
+        "4B5B: mov    word ptr [bp - 0x5a], ax",
+        "4B5E: mov    si, 0",
+        "4B61: mov    ax, word ptr [bp - 6]",
+        "4B64: add    ax, si",
+        "4B66: inc    ax",
+        "4B67: push   ax",
+        "4B68: push   word ptr [bp - 4]",
+        "4B6B: push   word ptr [bp - 0x58]",
+        "4B6E: call   0x227"
+      ]
+    },
+    {
+      "callsite": "0x4B8E",
+      "target": "0x22ff",
+      "context": [
+        "4B7A: push   ax",
+        "4B7B: mov    ax, si",
+        "4B7D: mov    dx, ax",
+        "4B7F: shl    ax, 1",
+        "4B81: add    ax, dx",
+        "4B83: add    ax, word ptr [bp - 0x5a]",
+        "4B86: add    ax, di",
+        "4B88: sub    ah, ah",
+        "4B8A: push   ax",
+        "4B8B: push   word ptr [bp - 0x58]",
+        "4B8E: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4C09",
+      "target": "0x227",
+      "context": [
+        "4BFB: inc    ax",
+        "4BFC: inc    ax",
+        "4BFD: inc    ax",
+        "4BFE: push   ax",
+        "4BFF: mov    ax, word ptr [bp - 4]",
+        "4C02: inc    ax",
+        "4C03: inc    ax",
+        "4C04: inc    ax",
+        "4C05: push   ax",
+        "4C06: push   word ptr [bp - 0x58]",
+        "4C09: call   0x227"
+      ]
+    },
+    {
+      "callsite": "0x4C1F",
+      "target": "0x22ff",
+      "context": [
+        "4C06: push   word ptr [bp - 0x58]",
+        "4C09: call   0x227",
+        "4C0C: add    sp, 6",
+        "4C0F: mov    ax, 1",
+        "4C12: push   ax",
+        "4C13: mov    ax, word ptr [bp - 2]",
+        "4C16: add    ax, 0x25",
+        "4C19: sub    ah, ah",
+        "4C1B: push   ax",
+        "4C1C: push   word ptr [bp - 0x58]",
+        "4C1F: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4C6C",
+      "target": "0x22ff",
+      "context": [
+        "4C54: jl     0x4c2d",
+        "4C56: cmp    word ptr [bp - 2], -1",
+        "4C5A: je     0x4c74",
+        "4C5C: mov    ax, 1",
+        "4C5F: push   ax",
+        "4C60: mov    ax, word ptr [bp - 2]",
+        "4C63: add    ax, 0x25",
+        "4C66: sub    ah, ah",
+        "4C68: push   ax",
+        "4C69: push   word ptr [bp - 0x58]",
+        "4C6C: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4C7F",
+      "target": "0x22ff",
+      "context": [
+        "4C68: push   ax",
+        "4C69: push   word ptr [bp - 0x58]",
+        "4C6C: call   0x22ff",
+        "4C6F: add    sp, 6",
+        "4C72: jmp    0x4c85",
+        "4C74: mov    ax, 3",
+        "4C77: push   ax",
+        "4C78: mov    ax, 0x20",
+        "4C7B: push   ax",
+        "4C7C: push   word ptr [bp - 0x58]",
+        "4C7F: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4C95",
+      "target": "0x227",
+      "context": [
+        "4C85: mov    ax, word ptr [bp - 6]",
+        "4C88: inc    ax",
+        "4C89: inc    ax",
+        "4C8A: push   ax",
+        "4C8B: mov    ax, word ptr [bp - 4]",
+        "4C8E: inc    ax",
+        "4C8F: inc    ax",
+        "4C90: inc    ax",
+        "4C91: push   ax",
+        "4C92: push   word ptr [bp - 0x58]",
+        "4C95: call   0x227"
+      ]
+    },
+    {
+      "callsite": "0x4CBD",
+      "target": "0x22ff",
+      "context": [
+        "4CA5: imul   word ptr [bp + 4]",
+        "4CA8: mov    bx, ax",
+        "4CAA: mov    al, byte ptr [bx + 0x4587]",
+        "4CAE: sub    ah, ah",
+        "4CB0: shl    ax, 1",
+        "4CB2: add    ax, si",
+        "4CB4: add    ax, 0x3a",
+        "4CB7: sub    ah, ah",
+        "4CB9: push   ax",
+        "4CBA: push   word ptr [bp - 0x58]",
+        "4CBD: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4CD8",
+      "target": "0x227",
+      "context": [
+        "4CC7: jl     0x4c9e",
+        "4CC9: mov    ax, word ptr [bp - 6]",
+        "4CCC: inc    ax",
+        "4CCD: push   ax",
+        "4CCE: mov    ax, word ptr [bp - 4]",
+        "4CD1: inc    ax",
+        "4CD2: inc    ax",
+        "4CD3: inc    ax",
+        "4CD4: push   ax",
+        "4CD5: push   word ptr [bp - 0x58]",
+        "4CD8: call   0x227"
+      ]
+    },
+    {
+      "callsite": "0x4D2A",
+      "target": "0x22ff",
+      "context": [
+        "4D12: cmp    word ptr [bx + 0x4428], 0",
+        "4D17: jle    0x4d32",
+        "4D19: mov    ax, 4",
+        "4D1C: push   ax",
+        "4D1D: mov    al, byte ptr [bx + 0x442d]",
+        "4D21: sub    ah, ah",
+        "4D23: inc    ax",
+        "4D24: sub    ah, ah",
+        "4D26: push   ax",
+        "4D27: push   word ptr [bp - 0x58]",
+        "4D2A: call   0x22ff"
+      ]
+    },
+    {
+      "callsite": "0x4D41",
+      "target": "0x22ff",
+      "context": [
+        "4D2A: call   0x22ff",
+        "4D2D: add    sp, 6",
+        "4D30: jmp    0x4d47",
+        "4D32: mov    ax, 4",
+        "4D35: push   ax",
+        "4D36: mov    ax, si",
+        "4D38: add    ax, 0x25",
+        "4D3B: sub    ah, ah",
+        "4D3D: push   ax",
+        "4D3E: push   word ptr [bp - 0x58]",
+        "4D41: call   0x22ff"
+      ]
+    }
+  ],
+  "bx_field_refs": [
+    "4B4C: mov    ax, word ptr [bx + 0x43d0]",
+    "4BA8: mov    al, byte ptr [bx + 0x4589]",
+    "4BB2: mov    ax, word ptr [bx + 0x526]",
+    "4BC7: cmp    byte ptr [bx + 0x450c], 0",
+    "4BE6: cmp    byte ptr [bx + 0x450d], 0",
+    "4C37: cmp    byte ptr [bx + 0x450a], 0",
+    "4C44: mov    ax, word ptr [bx + 0x532]",
+    "4CAA: mov    al, byte ptr [bx + 0x4587]",
+    "4CEB: mov    al, byte ptr [bx + 0x44f8]",
+    "4CFD: mov    al, byte ptr [bx + 0x44f8]",
+    "4D12: cmp    word ptr [bx + 0x4428], 0",
+    "4D1D: mov    al, byte ptr [bx + 0x442d]",
+    "4D59: push   word ptr [bx + 0x4402]",
+    "4D5D: push   word ptr [bx + 0x4400]",
+    "4D82: push   word ptr [bx + 0x4406]",
+    "4D86: push   word ptr [bx + 0x4404]"
+  ]
+}

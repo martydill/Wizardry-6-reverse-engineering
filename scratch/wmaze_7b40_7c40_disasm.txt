@@ -1,0 +1,112 @@
+7B40: in     al, dx
+7B41: dec    si
+7B42: push   ax
+7B43: call   0x27cb
+7B46: add    sp, 4
+7B49: test   ax, ax
+7B4B: jne    0x7b51
+7B4D: mov    ax, si
+7B4F: jmp    0x7b09
+7B51: inc    si
+7B52: cmp    si, 0x90
+7B56: jl     0x7af7
+7B58: mov    ax, 0xffff
+7B5B: jmp    0x7b09
+7B5D: push   bp
+7B5E: mov    bp, sp
+7B60: mov    ax, word ptr [bp + 6]
+7B63: dec    ax
+7B64: push   ax
+7B65: push   word ptr [bp + 4]
+7B68: lea    ax, [bp + 0xc]
+7B6B: push   ax
+7B6C: lea    ax, [bp + 0xa]
+7B6F: push   ax
+7B70: lea    ax, [bp + 8]
+7B73: push   ax
+7B74: call   0x7a37
+7B77: add    sp, 0xa
+7B7A: test   ax, ax
+7B7C: je     0x7b98
+7B7E: cmp    word ptr [0x363c], 0xa
+7B83: je     0x7b91
+7B85: cmp    word ptr [0x363c], 0xc
+7B8A: je     0x7b91
+7B8C: mov    ax, 2
+7B8F: jmp    0x7b94
+7B91: mov    ax, 0
+7B94: mov    sp, bp
+7B96: pop    bp
+7B97: ret    
+7B98: mov    ax, 2
+7B9B: push   ax
+7B9C: mov    ax, word ptr [bp + 0xc]
+7B9F: mov    cx, 6
+7BA2: shl    ax, cl
+7BA4: mov    cx, word ptr [bp + 0xa]
+7BA7: shl    cx, 1
+7BA9: shl    cx, 1
+7BAB: shl    cx, 1
+7BAD: add    ax, cx
+7BAF: add    ax, word ptr [bp + 8]
+7BB2: push   ax
+7BB3: mov    ax, word ptr [0x4faa]
+7BB6: add    ax, 0x60
+7BB9: push   ax
+7BBA: call   0x2841
+7BBD: add    sp, 6
+7BC0: jmp    0x7b94
+7BC2: push   bp
+7BC3: mov    bp, sp
+7BC5: push   word ptr [bp + 6]
+7BC8: mov    ax, word ptr [bp + 4]
+7BCB: dec    ax
+7BCC: push   ax
+7BCD: lea    ax, [bp + 0xc]
+7BD0: push   ax
+7BD1: lea    ax, [bp + 0xa]
+7BD4: push   ax
+7BD5: lea    ax, [bp + 8]
+7BD8: push   ax
+7BD9: call   0x7a37
+7BDC: add    sp, 0xa
+7BDF: test   ax, ax
+7BE1: je     0x7bfd
+7BE3: cmp    word ptr [0x363c], 0xa
+7BE8: je     0x7bf6
+7BEA: cmp    word ptr [0x363c], 0xc
+7BEF: je     0x7bf6
+7BF1: mov    ax, 2
+7BF4: jmp    0x7bf9
+7BF6: mov    ax, 0
+7BF9: mov    sp, bp
+7BFB: pop    bp
+7BFC: ret    
+7BFD: mov    ax, 2
+7C00: push   ax
+7C01: mov    ax, word ptr [bp + 0xc]
+7C04: mov    cx, 6
+7C07: shl    ax, cl
+7C09: mov    cx, word ptr [bp + 0xa]
+7C0C: shl    cx, 1
+7C0E: shl    cx, 1
+7C10: shl    cx, 1
+7C12: add    ax, cx
+7C14: add    ax, word ptr [bp + 8]
+7C17: push   ax
+7C18: mov    ax, word ptr [0x4faa]
+7C1B: add    ax, 0x120
+7C1E: push   ax
+7C1F: call   0x2841
+7C22: add    sp, 6
+7C25: jmp    0x7bf9
+7C27: push   bp
+7C28: mov    bp, sp
+7C2A: mov    ax, word ptr [0x4f9a]
+7C2D: jmp    0x7c77
+7C2F: mov    ax, word ptr [bp + 0xe]
+7C32: mov    bx, word ptr [bp + 4]
+7C35: add    word ptr [bx], ax
+7C37: mov    ax, word ptr [bp + 0x10]
+7C3A: mov    bx, word ptr [bp + 6]
+7C3D: add    word ptr [bx], ax
