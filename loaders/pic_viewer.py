@@ -71,8 +71,8 @@ def main() -> None:
     parser.add_argument(
         "--transparent",
         type=int,
-        default=-1,
-        help="Palette index to treat as transparent (default: none)",
+        default=None,
+        help="Palette index to treat as transparent (default: 15 for .PIC, none for .EGA)",
     )
     args = parser.parse_args()
     plane_order = [int(ch) for ch in args.plane_order.strip()]
@@ -138,7 +138,10 @@ def main() -> None:
         screen.fill((20, 20, 30))
 
         scaled = sprite.scale(scale)
-        rgba = scaled.to_rgba_bytes(transparent_index=args.transparent)
+        transparent_index = args.transparent
+        if transparent_index is None:
+            transparent_index = 15 if args.file.suffix.lower() == ".pic" else -1
+        rgba = scaled.to_rgba_bytes(transparent_index=transparent_index)
         surf = pygame.image.frombuffer(rgba, (scaled.width, scaled.height), "RGBA")
 
         x = (win_w - scaled.width) // 2

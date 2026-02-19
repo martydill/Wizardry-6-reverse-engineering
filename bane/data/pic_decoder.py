@@ -154,8 +154,10 @@ def decode_pic_frames(
             
         payload = decompressed[offset:offset + byte_len]
         
-        # Reconstruct full tiled planar data from sparse payload
-        full_data = bytearray(width_tiles * height_tiles * 32)
+        # Reconstruct full tiled planar data from sparse payload.
+        # Initialize absent tiles to 0xFF so they decode to palette index 15
+        # (cyan = transparent), matching the existing transparent_index=15 logic.
+        full_data = bytearray(b'\xff' * (width_tiles * height_tiles * 32))
         payload_ptr = 0
         
         # Tile indices in the mask are row-major (bit 0=top-left, 1=top-right, 2=next-row-left, ...)
