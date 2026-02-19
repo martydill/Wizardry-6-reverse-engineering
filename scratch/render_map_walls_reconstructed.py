@@ -155,23 +155,26 @@ def main():
     ap.add_argument("--map-id", type=lambda s: int(s, 0), default=0, help="Map id (default 0)")
     args = ap.parse_args()
 
-    map_id = args.map_id
-    base = record_base(map_id)
-
     orig = load(ORIG_PATH)
     mod = load(MOD_PATH)
-    if base + MAP_RECORD_SIZE > len(mod):
-        raise SystemExit(f"map-id {map_id} base 0x{base:X} outside NEWGAME.DBS")
+    max_maps = max(1, (len(mod) - MAP_HEADER_SIZE) // MAP_RECORD_SIZE)
 
-    orig_a, orig_b = decode_wall_planes(orig, base)
-    mod_a, mod_b = decode_wall_planes(mod, base)
-    origins = decode_origins(mod, base)
+    def decode_for(map_id: int):
+        base = record_base(map_id)
+        if base + MAP_RECORD_SIZE > len(mod):
+            raise ValueError(f"map-id {map_id} base 0x{base:X} outside NEWGAME.DBS")
+        orig_a, orig_b = decode_wall_planes(orig, base)
+        mod_a, mod_b = decode_wall_planes(mod, base)
+        origins = decode_origins(mod, base)
+        orig_bounds = {}
+        mod_bounds = {}
+        for b in range(12):
+            orig_bounds[b] = build_mode_boundaries(orig_a, orig_b, origins, map_id, b)
+            mod_bounds[b] = build_mode_boundaries(mod_a, mod_b, origins, map_id, b)
+        return base, origins, orig_bounds, mod_bounds
 
-    orig_bounds = {}
-    mod_bounds = {}
-    for b in range(12):
-        orig_bounds[b] = build_mode_boundaries(orig_a, orig_b, origins, map_id, b)
-        mod_bounds[b] = build_mode_boundaries(mod_a, mod_b, origins, map_id, b)
+    map_id = max(0, min(args.map_id, max_maps - 1))
+    base, origins, orig_bounds, mod_bounds = decode_for(map_id)
 
     pygame.init()
     screen = pygame.display.set_mode((1700, 980))
@@ -193,6 +196,12 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
+                map_id = (map_id + 1) % max_maps
+                base, origins, orig_bounds, mod_bounds = decode_for(map_id)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
+                map_id = (map_id - 1) % max_maps
+                base, origins, orig_bounds, mod_bounds = decode_for(map_id)
 
         screen.fill((20, 20, 24))
 
@@ -217,7 +226,7 @@ def main():
         lines = [
             f"Map {map_id} reconstructed from base=0x{base:X} (record stride 0x{MAP_RECORD_SIZE:X})",
             "Walls: mode-resolved 2-bit planes (+0x60/+0x120), stitched by +0x1E0/+0x1EC origin tables",
-            "Blue=original, White=modified, Esc=quit",
+            f"Blue=original, White=modified, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
         ]
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 225)), (24, 20 + i * 18))
