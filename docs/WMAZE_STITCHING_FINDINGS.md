@@ -177,6 +177,34 @@ This proves:
   not a separate hidden source;
 - our record model (`base = 0x019E + map_id*0x0C0E`) is consistent with runtime behavior.
 
+## Entry/call chain notes (WBASE)
+
+- `WBASE:0x5E8D` is the high-level loader gateway:
+  - `call 0x535B` (pre-check / UI gate)
+  - `call 0x5626` (core load routine; argument forwarded from caller)
+  - on success, enters post-load setup (`0x5C55`) and state transition.
+- `0x5626` then executes the full DB ingest path (`open -> seek -> multi-read -> close`)
+  described above.
+
+## 0x42 tail-state mapping (partial but concrete)
+
+After reading the trailing `0x42` bytes into stack local `[bp-0x48]`, loader code at
+`WBASE:0x5A92..0x5AE3` copies words into globals. Confirmed mapping:
+
+- `w00 -> 0x363C` (active map id)
+- `w01..w13 -> 0x4FA4,0x4FA2,0x4FA0,0x4F9E,0x4F9C,0x4F9A,0x4F98,0x4F96,0x4F94,0x4F92,0x4F90,0x4F8E,0x4F8C`
+- `w20/w21 -> 0x4F80/0x4F82` (32-bit pair)
+- `w22/w23 -> 0x4F7C/0x4F7E` (32-bit pair)
+- `w24/w25 -> 0x4F78/0x4F7A` (32-bit pair)
+- `w32 -> [bp-8] -> block-record count used by subsequent `0x1B0` read loop (i.e., `0x43CE` source)`
+
+This aligns with the save-side symmetry (where `0x43CE` is staged before tail write).
+In current `NEWGAME.DBS`, `w32=0`, and file size has no trailing block-record section.
+
+Utility:
+
+- `scratch/decode_tail_state42.py` decodes and prints this mapping from current DB.
+
 ## Practical tooling status
 
 - `scratch/render_map_walls_reconstructed.py`
