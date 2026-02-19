@@ -197,6 +197,54 @@ def draw_world_edges(screen, ox, oy, cell, edges, origins, color, width, flip_x=
     screen.blit(tmp, (ox, oy))
 
 
+def collect_world_edge_values(a_vals, b_vals, origins, map_id):
+    out = []
+    for b, (ox, oy) in enumerate(origins):
+        if not block_enabled(origins, b):
+            continue
+        for y in range(9):
+            for x in range(8):
+                if y == 0:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, 0, x, 2)
+                else:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, y - 1, x, 0)
+                if val:
+                    out.append(("h", ox + x, oy + y, val))
+        for y in range(8):
+            for x in range(9):
+                if x == 0:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, y, 0, 3)
+                else:
+                    val = wall_mode_value(a_vals, b_vals, origins, map_id, b, y, x - 1, 1)
+                if val:
+                    out.append(("v", ox + x, oy + y, val))
+    return out
+
+
+def draw_edge_markers(
+    screen, ox, oy, cell, edge_vals, origins, color, radius=2, value_filter=(1, 3), flip_x=False, flip_y=False
+):
+    min_x, min_y, max_x, max_y = stitched_bounds(origins)
+    surf_w = max(1, (max_x - min_x) * cell)
+    surf_h = max(1, (max_y - min_y) * cell)
+    tmp = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+
+    for kind, x, y, val in edge_vals:
+        if val not in value_filter:
+            continue
+        px = (x - min_x) * cell
+        py = (y - min_y) * cell
+        if kind == "h":
+            cx, cy = px + (cell // 2), py
+        else:
+            cx, cy = px, py + (cell // 2)
+        pygame.draw.circle(tmp, color, (cx, cy), radius)
+
+    if flip_x or flip_y:
+        tmp = pygame.transform.flip(tmp, flip_x, flip_y)
+    screen.blit(tmp, (ox, oy))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Render reconstructed maze walls from WBASE/WMAZE load model")
     ap.add_argument("--map-id", type=lambda s: int(s, 0), default=0, help="Map id (default 0)")
@@ -218,10 +266,12 @@ def main():
         for b in range(12):
             orig_bounds[b] = build_mode_boundaries(orig_a, orig_b, origins, map_id, b)
             mod_bounds[b] = build_mode_boundaries(mod_a, mod_b, origins, map_id, b)
-        return base, origins, orig_bounds, mod_bounds
+        orig_edge_vals = collect_world_edge_values(orig_a, orig_b, origins, map_id)
+        mod_edge_vals = collect_world_edge_values(mod_a, mod_b, origins, map_id)
+        return base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals
 
     map_id = max(0, min(args.map_id, max_maps - 1))
-    base, origins, orig_bounds, mod_bounds = decode_for(map_id)
+    base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals = decode_for(map_id)
 
     pygame.init()
     screen = pygame.display.set_mode((1700, 980))
@@ -245,10 +295,10 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
                 map_id = (map_id + 1) % max_maps
-                base, origins, orig_bounds, mod_bounds = decode_for(map_id)
+                base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals = decode_for(map_id)
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
                 map_id = (map_id - 1) % max_maps
-                base, origins, orig_bounds, mod_bounds = decode_for(map_id)
+                base, origins, orig_bounds, mod_bounds, orig_edge_vals, mod_edge_vals = decode_for(map_id)
 
         screen.fill((20, 20, 24))
 
@@ -287,11 +337,38 @@ def main():
         draw_world_edges(
             screen, st_x, st_y, stitched_cell, added_edges, origins, (255, 80, 80), 3, flip_y=True
         )
+        # Value semantics (current best RE model):
+        # - 1: passage-like special edge
+        # - 3: door-like special edge
+        draw_edge_markers(
+            screen,
+            st_x,
+            st_y,
+            stitched_cell,
+            mod_edge_vals,
+            origins,
+            (80, 180, 220),
+            radius=2,
+            value_filter=(1,),
+            flip_y=True,
+        )
+        draw_edge_markers(
+            screen,
+            st_x,
+            st_y,
+            stitched_cell,
+            mod_edge_vals,
+            origins,
+            (170, 120, 60),
+            radius=2,
+            value_filter=(3,),
+            flip_y=True,
+        )
 
         lines = [
             f"Map {map_id} reconstructed from base=0x{base:X} (record stride 0x{MAP_RECORD_SIZE:X})",
             "Walls: mode-resolved 2-bit planes (+0x60/+0x120), stitched by +0x1E0/+0x1EC origin tables",
-            f"Blue=original, White=modified, Red=added, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
+            f"Blue=original, White=modified, Red=added, Cyan=passages(v=1), Brown=doors(v=3), Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
         ]
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 225)), (24, 20 + i * 18))
