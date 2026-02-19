@@ -137,17 +137,64 @@ def stitched_bounds(origins):
     return min(xs), min(ys), max(xs) + 8, max(ys) + 8
 
 
-def draw_stitched(screen, ox, oy, cell, boundaries_by_block, origins, color, width):
-    min_x, min_y, _, _ = stitched_bounds(origins)
+def draw_stitched(screen, ox, oy, cell, boundaries_by_block, origins, color, width, flip_x=False, flip_y=False):
+    min_x, min_y, max_x, max_y = stitched_bounds(origins)
+    surf_w = max(1, (max_x - min_x) * cell)
+    surf_h = max(1, (max_y - min_y) * cell)
+    tmp = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+
     for b in range(12):
         if b not in boundaries_by_block:
             continue
         if not block_enabled(origins, b):
             continue
         bx, by = origins[b]
-        px = ox + (bx - min_x) * cell
-        py = oy + (by - min_y) * cell
-        draw_block_panel(screen, px, py, cell, boundaries_by_block[b], color, width)
+        px = (bx - min_x) * cell
+        py = (by - min_y) * cell
+        draw_block_panel(tmp, px, py, cell, boundaries_by_block[b], color, width)
+
+    if flip_x or flip_y:
+        tmp = pygame.transform.flip(tmp, flip_x, flip_y)
+    screen.blit(tmp, (ox, oy))
+
+
+def collect_world_edges(boundaries_by_block, origins):
+    out = set()
+    for b in range(12):
+        if b not in boundaries_by_block:
+            continue
+        if not block_enabled(origins, b):
+            continue
+        ox, oy = origins[b]
+        h, v = boundaries_by_block[b]
+        for y in range(9):
+            for x in range(8):
+                if h[y][x]:
+                    out.add(("h", ox + x, oy + y))
+        for y in range(8):
+            for x in range(9):
+                if v[y][x]:
+                    out.add(("v", ox + x, oy + y))
+    return out
+
+
+def draw_world_edges(screen, ox, oy, cell, edges, origins, color, width, flip_x=False, flip_y=False):
+    min_x, min_y, max_x, max_y = stitched_bounds(origins)
+    surf_w = max(1, (max_x - min_x) * cell)
+    surf_h = max(1, (max_y - min_y) * cell)
+    tmp = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+
+    for kind, x, y in edges:
+        px = (x - min_x) * cell
+        py = (y - min_y) * cell
+        if kind == "h":
+            pygame.draw.line(tmp, color, (px, py), (px + cell, py), width)
+        else:
+            pygame.draw.line(tmp, color, (px, py), (px, py + cell), width)
+
+    if flip_x or flip_y:
+        tmp = pygame.transform.flip(tmp, flip_x, flip_y)
+    screen.blit(tmp, (ox, oy))
 
 
 def main():
@@ -218,15 +265,33 @@ def main():
             draw_block_panel(screen, px, py, panel_cell, mod_bounds[b], (230, 235, 245), 2)
 
         # Stitched composite.
-        st_x = atlas_x + 4 * (p_w + gap) + 40
+        stitched_cell = 8
+        min_x, min_y, max_x, max_y = stitched_bounds(origins)
+        stitched_w = max(1, (max_x - min_x) * stitched_cell)
+        stitched_h = max(1, (max_y - min_y) * stitched_cell)
+        desired_x = atlas_x + 4 * (p_w + gap) + 24
+        max_x_fit = screen.get_width() - stitched_w - 20
+        st_x = max(20, min(desired_x, max_x_fit))
         st_y = atlas_y
-        draw_stitched(screen, st_x, st_y, 20, orig_bounds, origins, (100, 110, 140), 1)
-        draw_stitched(screen, st_x, st_y, 20, mod_bounds, origins, (230, 235, 245), 2)
+        max_y_fit = screen.get_height() - stitched_h - 20
+        st_y = max(20, min(st_y, max_y_fit))
+        orig_edges = collect_world_edges(orig_bounds, origins)
+        mod_edges = collect_world_edges(mod_bounds, origins)
+        added_edges = mod_edges - orig_edges
+        draw_stitched(
+            screen, st_x, st_y, stitched_cell, orig_bounds, origins, (100, 110, 140), 1, flip_y=True
+        )
+        draw_stitched(
+            screen, st_x, st_y, stitched_cell, mod_bounds, origins, (230, 235, 245), 2, flip_y=True
+        )
+        draw_world_edges(
+            screen, st_x, st_y, stitched_cell, added_edges, origins, (255, 80, 80), 3, flip_y=True
+        )
 
         lines = [
             f"Map {map_id} reconstructed from base=0x{base:X} (record stride 0x{MAP_RECORD_SIZE:X})",
             "Walls: mode-resolved 2-bit planes (+0x60/+0x120), stitched by +0x1E0/+0x1EC origin tables",
-            f"Blue=original, White=modified, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
+            f"Blue=original, White=modified, Red=added, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
         ]
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 225)), (24, 20 + i * 18))
