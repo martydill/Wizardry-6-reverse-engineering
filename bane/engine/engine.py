@@ -55,7 +55,7 @@ class Engine:
         # Core systems
         self.event_bus = EventBus()
         self.resources = ResourceManager(config)
-        self.renderer = Renderer(self.screen, config.scale_factor)
+        self.renderer = Renderer(self.screen, config.scale_factor, config.gamedata_path)
         self.state_machine = StateMachine()
 
         # Clock for frame timing
@@ -141,7 +141,7 @@ class Engine:
                 (self.config.window_width, self.config.window_height),
                 pygame.RESIZABLE,
             )
-        self.renderer = Renderer(self.screen, self.config.scale_factor)
+        self.renderer = Renderer(self.screen, self.config.scale_factor, self.config.gamedata_path)
 
     def _render_debug_overlay(self) -> None:
         """Render FPS and state info."""

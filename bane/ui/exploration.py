@@ -33,7 +33,7 @@ class ExplorationState(State):
     def __init__(self, state_machine: StateMachine) -> None:
         super().__init__(state_machine)
         self._engine: Engine | None = None
-        self._position = MapPosition(level=0, x=1, y=1, facing=Direction.NORTH)
+        self._position = MapPosition(level=11, x=131, y=141, facing=Direction.NORTH)
         self._message_log: list[str] = []
         self._message_timer = 0.0
 
@@ -62,15 +62,13 @@ class ExplorationState(State):
         if self._engine is None:
             return
 
-        dungeon = self._engine.resources.dungeon_map
-
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP or event.key == pygame.K_w:
-                    self._try_move(dungeon, self._position)
+                    self._try_move(self._position)
                 elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                     backward = self._position.turn_around()
-                    self._try_move(dungeon, backward)
+                    self._try_move(backward)
                 elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
                     self._position = self._position.turn_left()
                     self._add_message(f"Facing {self._position.facing.name}")
@@ -85,7 +83,7 @@ class ExplorationState(State):
                         self._position.y,
                         self._position.facing.turn_left(),
                     )
-                    new_pos = self._try_move_silent(dungeon, strafe)
+                    new_pos = self._try_move_silent(strafe)
                     if new_pos:
                         self._position = MapPosition(
                             new_pos.level, new_pos.x, new_pos.y,
@@ -99,7 +97,7 @@ class ExplorationState(State):
                         self._position.y,
                         self._position.facing.turn_right(),
                     )
-                    new_pos = self._try_move_silent(dungeon, strafe)
+                    new_pos = self._try_move_silent(strafe)
                     if new_pos:
                         self._position = MapPosition(
                             new_pos.level, new_pos.x, new_pos.y,
@@ -112,59 +110,41 @@ class ExplorationState(State):
                 elif event.key == pygame.K_ESCAPE:
                     self.state_machine.pop()
 
-    def _try_move(self, dungeon: DungeonMap, pos: MapPosition) -> None:
+    def _get_dir_vec(self, facing: Direction) -> tuple[int, int]:
+        if facing == Direction.NORTH: return 0, -1
+        if facing == Direction.SOUTH: return 0, 1
+        if facing == Direction.EAST: return 1, 0
+        if facing == Direction.WEST: return -1, 0
+        return 0, -1
+
+    def _can_move(self, pos: MapPosition) -> bool:
+        if not self._engine: return False
+        maze = self._engine.renderer.renderer_3d.maze
+        dx, dy = self._get_dir_vec(pos.facing)
+        
+        # Check if maze map is loaded
+        if pos.level not in maze.maps:
+            maze.load_map(pos.level)
+            
+        wall = maze.get_wall(pos.level, pos.x, pos.y, dx, dy)
+        return wall == 0
+
+    def _try_move(self, pos: MapPosition) -> None:
         """Try to move forward from the given position."""
-        if dungeon.can_move(pos):
+        if self._can_move(pos):
             new_pos = pos.forward()
             self._position = MapPosition(
                 new_pos.level, new_pos.x, new_pos.y, self._position.facing
             )
-            dungeon.mark_visited(self._position.level, self._position.x, self._position.y)
-            self._check_tile_effects(dungeon)
+            # self._check_tile_effects(dungeon) # Disabled until SCENARIO is loaded
         else:
             self._add_message("You can't go that way.")
 
-    def _try_move_silent(self, dungeon: DungeonMap, pos: MapPosition) -> MapPosition | None:
+    def _try_move_silent(self, pos: MapPosition) -> MapPosition | None:
         """Try to move without messages. Returns new pos or None."""
-        if dungeon.can_move(pos):
-            new_pos = pos.forward()
-            dungeon.mark_visited(new_pos.level, new_pos.x, new_pos.y)
-            return new_pos
+        if self._can_move(pos):
+            return pos.forward()
         return None
-
-    def _check_tile_effects(self, dungeon: DungeonMap) -> None:
-        """Check for special tile effects at current position."""
-        special = dungeon.get_special(
-            self._position.level, self._position.x, self._position.y
-        )
-        if special == TileSpecial.STAIRS_UP:
-            self._add_message("You see stairs going up.")
-        elif special == TileSpecial.STAIRS_DOWN:
-            self._add_message("You see stairs going down.")
-        elif special == TileSpecial.TELEPORTER:
-            self._add_message("You feel a strange sensation...")
-        elif special == TileSpecial.SPINNER:
-            # Silently rotate the player (the original doesn't tell you!)
-            import random
-            turns = random.randint(1, 3)
-            for _ in range(turns):
-                self._position = self._position.turn_right()
-        elif special == TileSpecial.DARK_ZONE:
-            self._add_message("Darkness surrounds you...")
-        elif special == TileSpecial.ANTI_MAGIC:
-            self._add_message("You feel your magic being suppressed.")
-        elif special == TileSpecial.DAMAGE_FLOOR:
-            self._add_message("The floor burns beneath your feet!")
-
-        # Random encounter check
-        encounter_chance = dungeon.get_encounter_chance(
-            self._position.level, self._position.x, self._position.y
-        )
-        if encounter_chance > 0:
-            import random
-            if random.randint(1, 100) <= encounter_chance:
-                self._add_message("Enemies appear!")
-                # TODO: Start combat
 
     def update(self, dt: float) -> None:
         if self._message_timer > 0:

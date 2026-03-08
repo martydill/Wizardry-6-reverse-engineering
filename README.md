@@ -5,6 +5,40 @@ There have been a number of previous reverse engineering efforts such as [Cosmic
 
 Let's see if we can change that!
 
+
+Here are some things that are kind of working. They assume that you have the original game data in a `gamedata/` folder.
+
+### Monster graphics:
+`python -m loaders.pic_viewer .\gamedata\mon25.PIC`
+
+<img src="./media/monster-animation.gif">
+
+### Map parsing:
+`python .\loaders/render_map_walls_reconstructed.py --map-id 8`
+
+<img src="./media/map.png">
+
+### Wall textures:
+`python  .\loaders\extract_mazedata_tiles.py`
+
+<img src="./media/map-tiles.png">
+
+### Items, Monsters, XP tables:
+`python .\loaders\scenario_viewer.py .\gamedata\scenario.dbs`
+
+<img src="./media/monster-data.png">
+
+### Screen viewers:
+`python loaders/ega_viewer.py .\gamedata\TITLEPAG.EGA`
+
+<img src="./media/screen-viewer.png">
+
+### Character portraits:
+`python -m loaders.pic_viewer .\gamedata\WPORT1.EGA`
+
+<img src="./media/character-portraits.gif">
+
+
 # Usage of AI tools
 This repo uses many AI tools including Codex, Claude, and Gemini. LLMs are extremely effective reverse engineering tools in many different ways, including:
  - Binary disassembly and logic analysis

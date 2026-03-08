@@ -45,9 +45,9 @@ class CharacterParseError(Exception):
 # Exact count TBD from reverse engineering
 SPELLS_PER_SCHOOL = 49  # 7 levels × 7 spells (estimated)
 
-# Character record size (estimated — to be refined from real data)
-# Will be determined precisely by analyzing actual PCFILE.DBS files
-ESTIMATED_CHAR_RECORD_SIZE = 512
+# Character record size for Wizardry 6
+CHAR_RECORD_SIZE = 432
+HEADER_SIZE = 24
 
 
 class CharacterParser:
@@ -66,15 +66,23 @@ class CharacterParser:
     def parse(self) -> list[CharacterData]:
         """Parse all characters from PCFILE.DBS."""
         logger.info("Parsing PCFILE.DBS from %s", self.path)
-        reader = BinaryReader.from_file(self.path)
+        data = self.path.read_bytes()
+        reader = BinaryReader(data)
         characters: list[CharacterData] = []
 
         try:
-            # Read character count (first 2 bytes)
-            count = reader.read_u16()
-            logger.info("Found %d characters in PCFILE.DBS", count)
+            # First character offset is at [4:6]
+            reader.seek(4)
+            first_char_offset = reader.read_u16()
+            # Record size can be inferred from gap between characters or known constant
+            # For Wiz6 PCFILE.DBS, it's 432 bytes.
+            
+            # Calculate count based on file size and offset
+            count = (len(data) - first_char_offset) // CHAR_RECORD_SIZE
+            logger.info("Detected %d characters in PCFILE.DBS", count)
 
             for i in range(count):
+                reader.seek(first_char_offset + i * CHAR_RECORD_SIZE)
                 char = self._parse_character(reader, i)
                 characters.append(char)
 

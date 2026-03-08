@@ -19,7 +19,6 @@ from bane.data.pic_decoder import (
 )
 from bane.data.sprite_decoder import (
     DEFAULT_16_PALETTE,
-    TITLEPAG_PALETTE,
     decode_ega_file,
     decode_ega_frames,
 )
@@ -167,7 +166,7 @@ def main() -> None:
         controls = font.render(controls_text, True, (120, 120, 120))
         screen.blit(controls, (10, win_h - 30))
 
-        palette = TITLEPAG_PALETTE if args.file.suffix.lower() == ".pic" else DEFAULT_16_PALETTE
+        palette = DEFAULT_16_PALETTE
         palette_y = win_h - 60
         for i, color in enumerate(palette):
             px = 10 + i * 20

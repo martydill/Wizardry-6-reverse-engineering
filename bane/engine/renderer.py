@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pygame
@@ -20,6 +21,7 @@ from bane.data.enums import Direction, WallType
 from bane.data.map_loader import DungeonMap, MapPosition
 from bane.data.sprite_decoder import Sprite
 from bane.engine.config import ORIGINAL_HEIGHT, ORIGINAL_WIDTH
+from bane.engine.renderer_3d import Renderer3D
 
 if TYPE_CHECKING:
     from bane.data.models import TileData
@@ -27,8 +29,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Dungeon viewport dimensions (in original resolution coordinates)
-VIEWPORT_X = 8
-VIEWPORT_Y = 8
+VIEWPORT_X = 72
+VIEWPORT_Y = 44
 VIEWPORT_W = 176
 VIEWPORT_H = 112
 
@@ -58,13 +60,17 @@ class Renderer:
     then scales up to the window size for pixel-perfect display.
     """
 
-    def __init__(self, window_surface: pygame.Surface, scale: int = 3) -> None:
+    def __init__(self, window_surface: pygame.Surface, scale: int = 3, gamedata_path: Path = Path("gamedata")) -> None:
         self.window = window_surface
         self.scale = scale
         # Internal render target at original resolution
         self.internal = pygame.Surface((ORIGINAL_WIDTH, ORIGINAL_HEIGHT))
         self._font: pygame.font.Font | None = None
         self._sprite_cache: dict[int, pygame.Surface] = {}
+        
+        # 3D renderer for accurate Wizardry 6 views
+        self.renderer_3d = Renderer3D(gamedata_path)
+        self.current_map_id = -1
 
     @property
     def font(self) -> pygame.font.Font:
@@ -187,34 +193,21 @@ class Renderer:
         dungeon_map: DungeonMap,
         position: MapPosition,
     ) -> None:
-        """Render the first-person dungeon viewport.
-
-        Uses a simplified pseudo-3D approach for grid-based dungeons:
-        - Draw walls receding into the distance
-        - Layer-by-layer from far to near
-        - Each layer has left wall, right wall, front wall, floor, ceiling
-        """
-        # Draw floor and ceiling base
-        self.draw_rect(
-            VIEWPORT_X, VIEWPORT_Y,
-            VIEWPORT_W, VIEWPORT_H // 2,
-            COLOR_CEILING,
-        )
-        self.draw_rect(
-            VIEWPORT_X, VIEWPORT_Y + VIEWPORT_H // 2,
-            VIEWPORT_W, VIEWPORT_H // 2,
-            COLOR_FLOOR,
-        )
-
-        max_depth = 4
-        cells = dungeon_map.get_view_cells(position, max_depth)
-
-        # Render from back to front
-        for depth, cell_pos in reversed(list(enumerate(cells))):
-            tile = dungeon_map.get_tile(cell_pos.level, cell_pos.x, cell_pos.y)
-            if tile is None:
-                continue
-            self._render_dungeon_layer(tile, position.facing, depth, max_depth)
+        """Render the first-person dungeon viewport using the accurate 3D engine."""
+        map_id = position.level
+        if map_id != self.current_map_id:
+            self.renderer_3d.maze.load_map(map_id)
+            self.current_map_id = map_id
+        
+        # Facing in bane.data.enums.Direction is N=0, E=1, S=2, W=3
+        facing_map = {0: "N", 1: "E", 2: "S", 3: "W"}
+        facing_str = facing_map.get(position.facing.value, "N")
+        
+        # Accurate 3D view
+        view_surf = self.renderer_3d.render_view(map_id, position.x, position.y, facing_str)
+        
+        # Blit to internal surface at viewport position
+        self.internal.blit(view_surf, (VIEWPORT_X, VIEWPORT_Y))
 
     def _render_dungeon_layer(
         self,
