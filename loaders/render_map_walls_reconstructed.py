@@ -6,8 +6,7 @@ from pathlib import Path
 import pygame
 
 
-ORIG_PATH = Path("gamedata/NEWGAME_original.DBS")
-MOD_PATH = Path("gamedata/NEWGAME.DBS")
+DBS_PATH = Path("gamedata/NEWGAME.DBS")
 
 # Recovered from WBASE load path:
 # - header read size: 0x019E
@@ -406,34 +405,27 @@ def main():
     ap.add_argument("--map-id", type=lambda s: int(s, 0), default=0, help="Map id (default 0)")
     args = ap.parse_args()
 
-    orig = load(ORIG_PATH)
-    mod = load(MOD_PATH)
-    max_maps = max(1, (len(mod) - MAP_HEADER_SIZE) // MAP_RECORD_SIZE)
+    data = load(DBS_PATH)
+    max_maps = max(1, (len(data) - MAP_HEADER_SIZE) // MAP_RECORD_SIZE)
 
     def decode_for(map_id: int):
         base = record_base(map_id)
-        if base + MAP_RECORD_SIZE > len(mod):
+        if base + MAP_RECORD_SIZE > len(data):
             raise ValueError(f"map-id {map_id} base 0x{base:X} outside NEWGAME.DBS")
-        orig_a, orig_b = decode_wall_planes(orig, base)
-        mod_a, mod_b = decode_wall_planes(mod, base)
-        origins = decode_origins(mod, base)
-        feature_by_block, world_features = decode_features_by_block(mod, base, origins)
-        orig_bounds = {}
-        mod_bounds = {}
+        a_vals, b_vals = decode_wall_planes(data, base)
+        origins = decode_origins(data, base)
+        feature_by_block, world_features = decode_features_by_block(data, base, origins)
+        bounds = {}
         for b in range(12):
-            orig_bounds[b] = build_mode_boundaries(orig_a, orig_b, origins, map_id, b)
-            mod_bounds[b] = build_mode_boundaries(mod_a, mod_b, origins, map_id, b)
-        orig_edge_vals = collect_world_edge_values(orig_a, orig_b, origins, map_id)
-        mod_edge_vals = collect_world_edge_values(mod_a, mod_b, origins, map_id)
-        mod_block_edge_vals = collect_block_edge_values(mod_a, mod_b, origins, map_id)
+            bounds[b] = build_mode_boundaries(a_vals, b_vals, origins, map_id, b)
+        edge_vals = collect_world_edge_values(a_vals, b_vals, origins, map_id)
+        block_edge_vals = collect_block_edge_values(a_vals, b_vals, origins, map_id)
         return (
             base,
             origins,
-            orig_bounds,
-            mod_bounds,
-            orig_edge_vals,
-            mod_edge_vals,
-            mod_block_edge_vals,
+            bounds,
+            edge_vals,
+            block_edge_vals,
             feature_by_block,
             world_features,
         )
@@ -442,11 +434,9 @@ def main():
     (
         base,
         origins,
-        orig_bounds,
-        mod_bounds,
-        orig_edge_vals,
-        mod_edge_vals,
-        mod_block_edge_vals,
+        bounds,
+        edge_vals,
+        block_edge_vals,
         feature_by_block,
         world_features,
     ) = decode_for(map_id)
@@ -476,11 +466,9 @@ def main():
                 (
                     base,
                     origins,
-                    orig_bounds,
-                    mod_bounds,
-                    orig_edge_vals,
-                    mod_edge_vals,
-                    mod_block_edge_vals,
+                    bounds,
+                    edge_vals,
+                    block_edge_vals,
                     feature_by_block,
                     world_features,
                 ) = decode_for(map_id)
@@ -489,11 +477,9 @@ def main():
                 (
                     base,
                     origins,
-                    orig_bounds,
-                    mod_bounds,
-                    orig_edge_vals,
-                    mod_edge_vals,
-                    mod_block_edge_vals,
+                    bounds,
+                    edge_vals,
+                    block_edge_vals,
                     feature_by_block,
                     world_features,
                 ) = decode_for(map_id)
@@ -509,15 +495,14 @@ def main():
             pygame.draw.rect(screen, (84, 84, 92), (px, py, p_w, p_h), 1)
             lab = f"B{b} ({origins[b][0]},{origins[b][1]})"
             screen.blit(font.render(lab, True, (180, 180, 190)), (px, py - 18))
-            draw_block_panel(screen, px, py, panel_cell, orig_bounds[b], (100, 110, 140), 1)
             draw_block_features(screen, px, py, panel_cell, feature_by_block.get(b, []))
-            draw_block_panel(screen, px, py, panel_cell, mod_bounds[b], (230, 235, 245), 2)
+            draw_block_panel(screen, px, py, panel_cell, bounds[b], (230, 235, 245), 2)
             draw_block_edge_markers(
                 screen,
                 px,
                 py,
                 panel_cell,
-                mod_block_edge_vals.get(b, []),
+                block_edge_vals.get(b, []),
                 (170, 120, 60),
                 radius=3,
                 value_filter=(3,),
@@ -528,7 +513,7 @@ def main():
                 px,
                 py,
                 panel_cell,
-                mod_block_edge_vals.get(b, []),
+                block_edge_vals.get(b, []),
                 (80, 180, 220),
                 radius=3,
                 value_filter=(1,),
@@ -546,17 +531,8 @@ def main():
         st_y = atlas_y
         max_y_fit = screen.get_height() - stitched_h - 20
         st_y = max(20, min(st_y, max_y_fit))
-        orig_edges = collect_world_edges(orig_bounds, origins)
-        mod_edges = collect_world_edges(mod_bounds, origins)
-        added_edges = mod_edges - orig_edges
         draw_stitched(
-            screen, st_x, st_y, stitched_cell, orig_bounds, origins, (100, 110, 140), 1, flip_y=True
-        )
-        draw_stitched(
-            screen, st_x, st_y, stitched_cell, mod_bounds, origins, (230, 235, 245), 2, flip_y=True
-        )
-        draw_world_edges(
-            screen, st_x, st_y, stitched_cell, added_edges, origins, (255, 80, 80), 3, flip_y=True
+            screen, st_x, st_y, stitched_cell, bounds, origins, (230, 235, 245), 2, flip_y=True
         )
         # Value semantics (current best RE model):
         # - 1: passage-like special edge
@@ -566,7 +542,7 @@ def main():
             st_x,
             st_y,
             stitched_cell,
-            mod_edge_vals,
+            edge_vals,
             origins,
             (170, 120, 60),
             radius=3,
@@ -579,7 +555,7 @@ def main():
             st_x,
             st_y,
             stitched_cell,
-            mod_edge_vals,
+            edge_vals,
             origins,
             (80, 180, 220),
             radius=3,
@@ -592,7 +568,7 @@ def main():
         lines = [
             f"Map {map_id} reconstructed from base=0x{base:X} (record stride 0x{MAP_RECORD_SIZE:X})",
             "Walls: mode-resolved 2-bit planes (+0x60/+0x120), stitched by +0x1E0/+0x1EC origin tables",
-            f"Blue=original, White=modified, Red=added, Brown circles=doors(v=3), Cyan squares=passages(v=1), Filled cells=map features, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
+            f"White=walls, Brown circles=doors(v=3), Cyan squares=passages(v=1), Filled cells=map features, Left/Right=map prev/next, Esc=quit (0..{max_maps - 1})",
         ]
         for i, t in enumerate(lines):
             screen.blit(font.render(t, True, (220, 220, 225)), (24, 20 + i * 18))
