@@ -38,6 +38,10 @@ Here are some things that are kind of working. They assume that you have the ori
 
 <img src="./media/character-portraits.gif">
 
+### Fonts:
+`python -m tools.ega_viewer gamedata/WFONT0.EGA --scale 4`
+
+<img src="./media/fonts.gif">
 
 # Usage of AI tools
 This repo uses many AI tools including Codex, Claude, and Gemini. LLMs are extremely effective reverse engineering tools in many different ways, including:
