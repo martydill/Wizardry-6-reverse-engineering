@@ -39,9 +39,9 @@ Here are some things that are kind of working. They assume that you have the ori
 <img src="./media/character-portraits.gif">
 
 ### Fonts:
-`python -m tools.ega_viewer gamedata/WFONT0.EGA --scale 4`
+`python -m loaders.render_font "this is a stylish wizardry 6 font!" --max-width 150`
 
-<img src="./media/fonts.gif">
+<img src="./media/font.png">
 
 # Usage of AI tools
 This repo uses many AI tools including Codex, Claude, and Gemini. LLMs are extremely effective reverse engineering tools in many different ways, including:
