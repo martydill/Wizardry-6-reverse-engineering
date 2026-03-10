@@ -6,7 +6,12 @@ from pathlib import Path
 
 from PIL import Image
 
-from bane.data.sprite_decoder import DEFAULT_16_PALETTE
+from bane.data.sprite_decoder import DEFAULT_16_PALETTE, TITLEPAG_PALETTE
+
+
+MAZEDATA_GRAYSCALE_PALETTE: list[tuple[int, int, int]] = [
+    (i * 17, i * 17, i * 17) for i in range(16)
+]
 
 
 def _u16le(buf: bytes, off: int) -> int:
@@ -135,10 +140,9 @@ class EGA36ACPlanarBuffer:
                            | ((1 if (p3 & mask) else 0) << 3))
                     if idx == 0 and transparent_zero:
                         continue
-                    rr, gg, bb = DEFAULT_16_PALETTE[idx]
+                    rr, gg, bb = MAZEDATA_GRAYSCALE_PALETTE[idx]
                     px[x, y] = (rr, gg, bb, 255)
         return out
-
 
 def _resolve_file_src_segment_window(maze_bytes: bytes, seg_para: int) -> int | None:
     # 0x0B93 sets DS = cs:[0x149] (descriptor header segment), then DS += table.word0.
@@ -192,7 +196,11 @@ def _emulate_36ac_single_desc(
     plane_stride = width_bytes * plane_rows
     src_off = (src_off_base + x_bias) & 0xFFFF
     dst_off = x_byte + x_bias + y_row * planar.BYTES_PER_ROW
-    max_span = max(0, repeat_rows - 1) * width_bytes + max(0, plane_rows - 1) * plane_stride + width_bytes
+    # 0x0B93 uses header.byte4 as the per-row copy width and table.byte4 as the
+    # outer row count. table.byte3 is the source row stride.
+    copy_width_bytes = repeat_rows
+    row_count = plane_rows
+    max_span = max(0, row_count - 1) * width_bytes + max(0, 3) * plane_stride + max(0, copy_width_bytes)
     src_seg_window = _resolve_file_src_segment_window(tables.maze_bytes, seg_para)
     if src_seg_window is None:
         return {
@@ -207,13 +215,13 @@ def _emulate_36ac_single_desc(
     or_mode = int(mode_or_attr) != 0
     rows_drawn = 0
     bytes_copied = 0
-    for rep in range(repeat_rows):
-        dst_row_base = dst_off + rep * planar.BYTES_PER_ROW
-        src_rep_off = (src_off + rep * width_bytes) & 0xFFFF
+    for row_idx in range(row_count):
+        dst_row_base = dst_off + row_idx * planar.BYTES_PER_ROW
+        src_row_off = (src_off + row_idx * width_bytes) & 0xFFFF
         for plane in range(4):
-            plane_src_off = (src_rep_off + plane * plane_stride) & 0xFFFF
+            plane_src_off = (src_row_off + plane * plane_stride) & 0xFFFF
             plane_dst = dst_row_base + plane * planar.PLANE_SIZE
-            for i in range(width_bytes):
+            for i in range(copy_width_bytes):
                 src_addr = src_seg_window + ((plane_src_off + i) & 0xFFFF)
                 if 0 <= src_addr < len(tables.maze_bytes):
                     planar._write_byte(plane_dst + i, tables.maze_bytes[src_addr], or_mode=or_mode)
@@ -228,6 +236,8 @@ def _emulate_36ac_single_desc(
         "repeat_rows": int(repeat_rows),
         "width_bytes": int(width_bytes),
         "plane_rows": int(plane_rows),
+        "copy_width_bytes": int(copy_width_bytes),
+        "row_count": int(row_count),
         "rows_drawn": int(rows_drawn),
         "bytes_copied": int(bytes_copied),
         "dst_off": int(dst_off),
@@ -285,6 +295,8 @@ def _emulate_36ac_two_desc(
     plane_stride = width_bytes * plane_rows
     # 0D3E..0D4C: src start offset = table.byte2 + (table.byte3 - 1) - hdr3.byte3
     src_off = (src_off_base + (width_bytes - 1) - x_bias) & 0xFFFF
+    copy_width_bytes = repeat_rows
+    row_count = plane_rows
     src_seg_window = _resolve_file_src_segment_window(tables.maze_bytes, seg_para)
     if src_seg_window is None:
         return {
@@ -301,13 +313,13 @@ def _emulate_36ac_two_desc(
     bytes_copied = 0
     # Inner copy loops mirror single-branch structure, but per-byte source access is reversed
     # (SI decremented each byte) and transformed via xlat bit-reversal.
-    for rep in range(repeat_rows):
-        dst_row_base = dst_off + rep * planar.BYTES_PER_ROW
-        src_rep_off = (src_off + rep * width_bytes) & 0xFFFF
+    for row_idx in range(row_count):
+        dst_row_base = dst_off + row_idx * planar.BYTES_PER_ROW
+        src_row_off = (src_off + row_idx * width_bytes) & 0xFFFF
         for plane in range(4):
-            plane_src_off = (src_rep_off + plane * plane_stride) & 0xFFFF
+            plane_src_off = (src_row_off + plane * plane_stride) & 0xFFFF
             plane_dst = dst_row_base + plane * planar.PLANE_SIZE
-            for i in range(width_bytes):
+            for i in range(copy_width_bytes):
                 # 0D66/0DC4 paths read [si], then dec si (right-to-left source traversal)
                 cur_src_off = (plane_src_off - i) & 0xFFFF
                 src_addr = src_seg_window + cur_src_off
@@ -327,6 +339,8 @@ def _emulate_36ac_two_desc(
         "repeat_rows": int(repeat_rows),
         "width_bytes": int(width_bytes),
         "plane_rows": int(plane_rows),
+        "copy_width_bytes": int(copy_width_bytes),
+        "row_count": int(row_count),
         "rows_drawn": int(rows_drawn),
         "bytes_copied": int(bytes_copied),
         "dst_off": int(dst_off),

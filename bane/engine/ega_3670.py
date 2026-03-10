@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from bane.data.sprite_decoder import DEFAULT_16_PALETTE
+from bane.engine.ega_driver import MAZEDATA_GRAYSCALE_PALETTE
 
 
 def _signed16(v: int) -> int:
@@ -238,7 +238,7 @@ class _Scratch220C:
                             continue
                         x = tx * 8 + (7 - bit)
                         y = ty * 8 + r
-                        rr, gg, bb = DEFAULT_16_PALETTE[idx & 0x0F]
+                        rr, gg, bb = MAZEDATA_GRAYSCALE_PALETTE[idx & 0x0F]
                         px[x, y] = (rr, gg, bb, 255)
         return out
 
@@ -806,6 +806,7 @@ def render_estimated_queue_3670_events(
     events: list[dict],
     gamedata_dir: Path | None = None,
     prefer_exact_1d25_mon_seek0: bool = False,
+    allow_mon_runtime_sources: bool = True,
     overlay_debug_markers: bool = True,
 ) -> tuple[Image.Image | None, dict]:
     maze_bytes: bytes | None = None
@@ -914,7 +915,7 @@ def render_estimated_queue_3670_events(
                     candidates_across_sources.append(cand)
             # Runtime-informed WINIT bridge: some driver `type`s are staged from MONxx.PIC via `0x4721 -> 0x3664`.
             mon_specs = mon_loader_type_maps.get(int(t_idx), [])
-            if mon_specs and gamedata_dir is not None:
+            if allow_mon_runtime_sources and mon_specs and gamedata_dir is not None:
                 for mon_spec in mon_specs:
                     mon_rec = int(mon_spec.get("record_index", -1))
                     if mon_rec < 0:
@@ -1343,6 +1344,7 @@ def render_estimated_queue_3670_events(
                 "Current queue reconstruction may recover some x values from static WROOT image tables for specific 0x85D0/0x84F1 callsites; runtime-initialized table differences can still shift these.",
                 "The 3670 real replay path currently targets queue-consumer usage (single-byte attr stream, flags1=0, flags2=0) and does not yet emulate all 1D94 transforms/hardware modes exactly.",
                 "Optional strict mode (`prefer_exact_1d25_mon_seek0`) prefers disassembly-faithful MONxx seek=0 loader candidates for likely pre-maze type slots over heuristic intra-file RLE rescans.",
+                "Optional `allow_mon_runtime_sources=False` limits chunk recovery to MAZEDATA-only heuristics, which is safer for live WMAZE rendering while MON-backed overwrite timing remains unresolved.",
                 "Optional `overlay_debug_markers=False` returns only the real replay layer (no marker overlay), which is preferred for compositing into prototype viewport output.",
             ],
         },

@@ -567,26 +567,34 @@ def decode_ega_file(path: str | Path) -> Sprite:
             height=24,
         )
     elif "WFONT" in path.name.upper():
-        # Font collection
+        # Font collection - decode first frame only
         decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
-        
-        # Determine char size based on file size
-        if len(data) == 4096: # WFONT1, WFONT2...
-            # 256 chars * 16 bytes = 4096. 8x16 1bpp.
-            char_width, char_height = 8, 16
-        elif len(data) == 1024: # WFONT0
-            # 128 chars * 8 bytes = 1024. 8x8 1bpp.
+
+        if len(data) == 1024:
+            # WFONT0: 128 chars × 8 bytes = 1024. 1bpp 8×8, direct ASCII mapping.
             char_width, char_height = 8, 8
+            bytes_per_char = 8
+            pixels = []
+            for b in data[:bytes_per_char]:
+                for bit in range(7, -1, -1):
+                    pixels.append(15 if (b & (1 << bit)) else 0)
+        elif len(data) == 4096:
+            # WFONT1-4: 128 chars × 32 bytes = 4096. 4-plane EGA 8×8.
+            # Layout per char: 8 bytes plane0, 8 bytes plane1, 8 bytes plane2, 8 bytes plane3.
+            # Pixel color = plane0_bit | plane1_bit<<1 | plane2_bit<<2 | plane3_bit<<3
+            char_width, char_height = 8, 8
+            bytes_per_char = 32
+            planes = [data[p * 8 : p * 8 + 8] for p in range(4)]
+            pixels = []
+            for row in range(8):
+                for col in range(8):
+                    color = sum(((planes[p][row] >> (7 - col)) & 1) << p for p in range(4))
+                    pixels.append(color)
         else:
-            # Unknown, default to 8x8 and read what we can
             char_width, char_height = 8, 8
-            
-        bytes_per_char = (char_width * char_height) // 8
-        pixels = []
-        char_data = data[:bytes_per_char]
-        for b in char_data:
-            for bit in range(7, -1, -1):
-                pixels.append(15 if (b & (1 << bit)) else 0)
+            bytes_per_char = 8
+            pixels = [0] * 64
+
         return Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette)
     else:
         # Fallback/Unknown
@@ -622,29 +630,35 @@ def decode_ega_frames(path: str | Path) -> list[Sprite]:
             )
     elif "WFONT" in path.name.upper():
         decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
-        
-        if len(data) == 4096:
-            char_width, char_height = 8, 16
-            count = 256
-        elif len(data) == 1024:
-            char_width, char_height = 8, 8
-            count = 128
-        else:
-            char_width, char_height = 8, 8
-            count = len(data) // 8
 
-        bytes_per_char = (char_width * char_height) // 8
-        
-        for i in range(count):
-            offset = i * bytes_per_char
-            if offset + bytes_per_char > len(data):
-                break
-            char_data = data[offset : offset + bytes_per_char]
-            pixels = []
-            for b in char_data:
-                for bit in range(7, -1, -1):
-                    pixels.append(15 if (b & (1 << bit)) else 0)
-            frames.append(Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette))
+        if len(data) == 1024:
+            # WFONT0: 128 chars × 8 bytes. 1bpp 8×8. Frame N = ASCII char N.
+            char_width, char_height = 8, 8
+            bytes_per_char = 8
+            count = 128
+            for i in range(count):
+                char_data = data[i * bytes_per_char : i * bytes_per_char + bytes_per_char]
+                pixels = []
+                for b in char_data:
+                    for bit in range(7, -1, -1):
+                        pixels.append(15 if (b & (1 << bit)) else 0)
+                frames.append(Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette))
+        elif len(data) == 4096:
+            # WFONT1-4: 128 chars × 32 bytes. 4-plane EGA 8×8. Frame N = game char code N.
+            # Layout per char: 8 bytes plane0, 8 bytes plane1, 8 bytes plane2, 8 bytes plane3.
+            # Pixel color = plane0_bit | plane1_bit<<1 | plane2_bit<<2 | plane3_bit<<3
+            char_width, char_height = 8, 8
+            bytes_per_char = 32
+            count = 128
+            for i in range(count):
+                offset = i * bytes_per_char
+                planes = [data[offset + p * 8 : offset + p * 8 + 8] for p in range(4)]
+                pixels = []
+                for row in range(8):
+                    for col in range(8):
+                        color = sum(((planes[p][row] >> (7 - col)) & 1) << p for p in range(4))
+                        pixels.append(color)
+                frames.append(Sprite(width=char_width, height=char_height, pixels=pixels, palette=decoder.palette))
     
     return frames
 

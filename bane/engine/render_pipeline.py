@@ -629,7 +629,10 @@ def should_apply_7d8c_topflag(*, map_id: int, slot: VisibleSlot | None) -> bool:
     if slot is None or slot.channel4 is None:
         return False
     c4 = int(slot.channel4)
-    if c4 not in (0, 4, 5, 12):
+    # c4==0 was previously grouped into the 7E54 family, but that suppresses the
+    # only visible center-wall pass on the live start scene. Keep the stricter set
+    # until the 7F2C jump-table decode for zero is proven.
+    if c4 not in (4, 5, 12):
         return False
     if int(map_id) == 0x0C and slot.block is not None and int(slot.block) < 9:
         return False
@@ -850,12 +853,29 @@ def build_predicted_helper_events(row: PassStateRow, template: PassTemplate, dir
                 }
             )
     elif row.predicted_output_mode == "queue_84f1":
+        bp8_imm = template.immediate_by_bp_offset.get("0x08")
+        depth_index = max(0, int(row.depth) - 1)
         for call in queue_tables.get(table_name, {}).get(int(idx), []):
+            call_addr = str(call.get("call_addr"))
+            # Disassembly-grounded gating for WMAZE 0x8665 handler family (draw_index 1 on 0x85D0):
+            # - 0x869A only fires when bp+8 == 1 and bp+4 == 0 and [0x363E] > 0
+            # - 0x86CA fires on the bp+8 == 1 path when (bp+4 > 0) or [0x363E] == 0
+            # - 0x86F3 fires only on the bp+8 != 1 path and bp+4 > 0
+            if row.draw_target == "0x85D0" and int(idx) == 1:
+                if call_addr == "0x869A":
+                    if not (int(depth_index) == 0 and int(bp8_imm or 0) == 1):
+                        continue
+                elif call_addr == "0x86CA":
+                    if int(bp8_imm or 0) != 1:
+                        continue
+                elif call_addr == "0x86F3":
+                    if int(bp8_imm or 0) == 1 or int(depth_index) <= 0:
+                        continue
             args = [resolve_helper_arg_value(arg, template, row.depth) for arg in call.get("args_callee_order", [])]
             out.append(
                 {
                     "event_kind": "queue_84f1",
-                    "call_addr": str(call.get("call_addr")),
+                    "call_addr": call_addr,
                     "draw_index": int(idx),
                     "args": args,
                     "runtime_dependencies": unique_preserve_order(extract_runtime_dependencies(args)),
@@ -1576,7 +1596,13 @@ def normalize_predicted_84f1_queue_entry(event: dict[str, Any], queue_index: int
     return entry
 
 
-def build_predicted_queue_consumer_events(queue_entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_predicted_queue_consumer_events(
+    queue_entries: list[dict[str, Any]],
+    *,
+    scene_wx: int,
+    scene_wy: int,
+    facing_idx: int,
+) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     emit_index = 0
     max_depth = -1
@@ -1597,13 +1623,8 @@ def build_predicted_queue_consumer_events(queue_entries: list[dict[str, Any]]) -
             typ = e.get("type")
             if typ == 0xFF:
                 src = dict(e.get("source", {})) if isinstance(e.get("source"), dict) else {}
-                draw_index = src.get("draw_index")
-                call_84f1 = str(src.get("call_84f1", "")).lower()
-                use_swapped_desc_pair = int(draw_index) == 1 if isinstance(draw_index, int) else False
-                # 84F1 callsites 0x86CA/0x86F3 keep canonical (primary,-1) even in draw_index 1 passes.
-                if call_84f1 in {"0x86ca", "0x86f3"}:
-                    use_swapped_desc_pair = False
-                if use_swapped_desc_pair:
+                parity_521c = (int(depth) + int(scene_wx) + int(scene_wy) + (int(facing_idx) & 3)) & 1
+                if parity_521c:
                     pair1_primary = e.get("x1")
                     pair1_alt = e.get("x0")
                     pair2_primary = e.get("y1")
@@ -1621,6 +1642,7 @@ def build_predicted_queue_consumer_events(queue_entries: list[dict[str, Any]]) -
                         "queue_index": int(e.get("queue_index", -1)),
                         "source": src,
                         "wrapper_target": "0x36AC",
+                        "parity_521c": int(parity_521c),
                         "table_index": e.get("table_index"),
                         "x_primary": pair1_primary,
                         "x_alt": pair1_alt,
@@ -1641,6 +1663,7 @@ def build_predicted_queue_consumer_events(queue_entries: list[dict[str, Any]]) -
                             "queue_index": int(e.get("queue_index", -1)),
                             "source": src,
                             "wrapper_target": "0x36AC",
+                            "parity_521c": int(parity_521c),
                             "table_index": e.get("table_index"),
                             "x_primary": pair2_primary,
                             "x_alt": pair2_alt,
@@ -1942,6 +1965,7 @@ def replay_stage5_shadow_buffer(
                 events=batch_events,
                 gamedata_dir=gamedata,
                 prefer_exact_1d25_mon_seek0=True,
+                allow_mon_runtime_sources=False,
                 overlay_debug_markers=False,
             )
             for row in batched_3670_meta.get("real_trace", []) if isinstance(batched_3670_meta, dict) else []:
@@ -2632,6 +2656,12 @@ def build_stage1_pass_state(
             row.gate_predicted_enabled = bool(current_gates.get(gate_key, True)) if gate_key is not None else None
             if row.gate_predicted_enabled is False:
                 row.predicted_output_mode = "gated_off"
+            elif (
+                row.draw_target in ("0x85D0", "0x8B18")
+                and row.visible_slot is not None
+                and int(row.visible_slot.wall_value) == 0
+            ):
+                row.predicted_output_mode = "gated_off"
             elif row.draw_target == "0x8D07":
                 if row.visible_slot is not None and int(row.visible_slot.wall_value) == 0:
                     row.predicted_output_mode = "gated_off"
@@ -2699,7 +2729,12 @@ def build_stage1_pass_state(
         normalize_predicted_84f1_queue_entry(ev, idx, scratch_dir=scratch_dir)
         for idx, ev in enumerate(deferred_queue_emission_events)
     ]
-    predicted_queue_consumer_events = build_predicted_queue_consumer_events(predicted_queue_entries)
+    predicted_queue_consumer_events = build_predicted_queue_consumer_events(
+        predicted_queue_entries,
+        scene_wx=int(scene.wx),
+        scene_wy=int(scene.wy),
+        facing_idx=int(facing_idx),
+    )
 
     stage1 = Stage1PassState(
         pass_templates=pass_templates,
@@ -2811,7 +2846,14 @@ def render_shadow_coverage_mask(replay: ShadowBufferReplayResult) -> Image.Image
     return img
 
 
-def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowBufferReplayResult, *, gamedata: Path) -> Image.Image:
+def render_stage5_shadow_image(
+    target: Stage5ShadowBufferTarget,
+    replay: ShadowBufferReplayResult,
+    *,
+    gamedata: Path,
+    include_deferred_3670: bool = True,
+    include_present_36a0: bool = True,
+) -> Image.Image:
     width = int(replay.width_px)
     height = int(replay.height_px)
     img = Image.new("RGBA", (width, height), (6, 8, 14, 255))
@@ -2823,7 +2865,6 @@ def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowB
     from bane.engine import ega_3670 as ega_3670_emu
 
     tables = ega_36ac_emu.EGA36ACTables.load(mazedata_ega=mazedata_ega, ega_drv=ega_drv)
-    planar = ega_36ac_emu.EGA36ACPlanarBuffer()
     full_canvas = Image.new("RGBA", (320, 200), (0, 0, 0, 0))
     present_overlay_canvas = Image.new("RGBA", (320, 200), (0, 0, 0, 0))
     ega_drv_raw = _load_ega_drv_raw(gamedata)
@@ -2841,6 +2882,7 @@ def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowB
             wrapper_args = [a.get("value") for a in args if isinstance(a, dict) and isinstance(a.get("value"), int)]
             if len(wrapper_args) != 3:
                 continue
+            planar = ega_36ac_emu.EGA36ACPlanarBuffer()
             ega_36ac_emu.emulate_36ac_wrapper_call(
                 planar,
                 tables,
@@ -2848,7 +2890,7 @@ def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowB
                 arg2_mode_or_attr=int(wrapper_args[1]),
                 arg3_desc_or_minus1=int(wrapper_args[2]),
             )
-            full_canvas = Image.alpha_composite(full_canvas, planar.to_rgba_image(transparent_zero=False))
+            full_canvas = Image.alpha_composite(full_canvas, planar.to_rgba_image(transparent_zero=True))
             continue
         if op_kind == "shadow_draw_36ac_deferred":
             table_index = op.get("table_index")
@@ -2856,6 +2898,7 @@ def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowB
             x_alt = op.get("x_alt")
             if not all(isinstance(v, int) for v in (table_index, x_primary, x_alt)):
                 continue
+            planar = ega_36ac_emu.EGA36ACPlanarBuffer()
             ega_36ac_emu.emulate_36ac_wrapper_call(
                 planar,
                 tables,
@@ -2863,9 +2906,11 @@ def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowB
                 arg2_mode_or_attr=int(table_index),
                 arg3_desc_or_minus1=int(x_alt),
             )
-            full_canvas = Image.alpha_composite(full_canvas, planar.to_rgba_image(transparent_zero=False))
+            full_canvas = Image.alpha_composite(full_canvas, planar.to_rgba_image(transparent_zero=True))
             continue
         if op_kind == "shadow_draw_3670_deferred":
+            if not include_deferred_3670:
+                continue
             typ = op.get("type")
             x0 = op.get("x0")
             y0 = op.get("y0")
@@ -2901,12 +2946,15 @@ def render_stage5_shadow_image(target: Stage5ShadowBufferTarget, replay: ShadowB
                 events=[ev],
                 gamedata_dir=gamedata,
                 prefer_exact_1d25_mon_seek0=True,
+                allow_mon_runtime_sources=False,
                 overlay_debug_markers=False,
             )
             if ev_img is not None:
                 full_canvas = Image.alpha_composite(full_canvas, ev_img)
             continue
         if op_kind == "shadow_present_36a0" and ega_drv_raw is not None:
+            if not include_present_36a0:
+                continue
             rect_px = dict(op.get("viewport_rect_px", {}))
             current = emulate_36a0_grid_state_from_rect(rect_px)
             overlay_call_plan = emulate_36a0_overlay_call_plan(

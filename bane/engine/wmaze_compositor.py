@@ -759,6 +759,81 @@ def _helper_draw_modes_for_index(helper_draw_mode_doc: dict, helper: str, draw_i
     return [str(m) for m in modes] if isinstance(modes, list) else []
 
 
+def _current_scene_origin_cell(visible_details: list[dict], facing_idx: int) -> tuple[int, int] | None:
+    step_map = {
+        0: (0, -1),
+        1: (1, 0),
+        2: (0, 1),
+        3: (-1, 0),
+    }
+    step = step_map.get(int(facing_idx) & 3)
+    if step is None:
+        return None
+    for row in visible_details:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("orient")) != "center":
+            continue
+        try:
+            if int(row.get("depth", -1)) != 1:
+                continue
+            base = row.get("base_cell", {}) or {}
+            wx = int(base.get("wx"))
+            wy = int(base.get("wy"))
+        except Exception:
+            continue
+        return (wx - int(step[0]), wy - int(step[1]))
+    return None
+
+
+def _resolve_8d07_call_rows(
+    *,
+    pass_rec: dict,
+    depth_index: int,
+    visible_details: list[dict],
+    facing_idx: int,
+) -> tuple[list[dict], dict]:
+    p_imms = pass_rec.get("immediate_by_bp_offset", {})
+    if not isinstance(p_imms, dict):
+        p_imms = {}
+    scene_origin = _current_scene_origin_cell(visible_details, facing_idx)
+    parity_521a = 0
+    if scene_origin is not None:
+        parity_521a = (int(scene_origin[0]) + int(scene_origin[1]) + (int(facing_idx) & 3)) & 1
+    parity_3646 = 0
+    table_5042_zero = True
+    table_50aa_zero = True
+    table_504e_zero = True
+
+    rows: list[dict] = []
+    if table_5042_zero:
+        rows.append({"bp_offset_primary": "0x08", "depth_add": True, "imm_primary": None})
+        if parity_521a != 0:
+            rows.append({"bp_offset_primary": "0x0A", "depth_add": True, "imm_primary": None})
+    if table_50aa_zero and table_504e_zero:
+        rows.append({"bp_offset_primary": "0x0C", "depth_add": True, "imm_primary": None})
+        if parity_521a != 0:
+            rows.append({"bp_offset_primary": "0x0E", "depth_add": True, "imm_primary": None})
+    elif not table_504e_zero:
+        rows.append({"bp_offset_primary": "0x10", "depth_add": True, "imm_primary": None})
+        if ((parity_521a + parity_3646) & 1) != 0:
+            rows.append({"bp_offset_primary": "0x12", "depth_add": True, "imm_primary": None})
+    trace = {
+        "helper_selector": "0x8D07",
+        "source": "8C23..8D12 branch model",
+        "depth_index": int(depth_index),
+        "scene_origin": [int(scene_origin[0]), int(scene_origin[1])] if scene_origin is not None else None,
+        "parity_521a": int(parity_521a),
+        "parity_3646": int(parity_3646),
+        "table_5042_zero": bool(table_5042_zero),
+        "table_50aa_zero": bool(table_50aa_zero),
+        "table_504e_zero": bool(table_504e_zero),
+        "selected_bp_offsets": [str(r.get("bp_offset_primary")) for r in rows],
+        "ignored_bp_offsets": [k for k in sorted(p_imms.keys()) if k not in {str(r.get("bp_offset_primary")) for r in rows}],
+    }
+    return (rows, trace)
+
+
 def _build_helper_36ac_call_map(doc: dict) -> dict[str, dict[int, list[dict]]]:
     out: dict[str, dict[int, list[dict]]] = {"0x85D0": {}, "0x8B18": {}, "0x8D07": {}}
     tbls = doc.get("tables", {})
@@ -1118,8 +1193,9 @@ def render_wmaze_pass_experimental(
                 }
             )
             return
-        # Primary switch appears c4-indexed; handler 0x7E54 is selected for c4 indexes:
-        # {0,4,5,12}. This is extracted from 7F2C.
+        # Primary switch appears c4-indexed; treat {4,5,12} as the current
+        # disassembly-backed top-flag family. c4==0 was previously included here,
+        # but that suppresses the visible center-wall pass on the live start scene.
         if c4 is None:
             sideeffect_reason = "missing_c4"
             gate_trace.append(
@@ -1141,7 +1217,7 @@ def render_wmaze_pass_experimental(
             )
             return
         c4i = int(c4)
-        if c4i not in (0, 4, 5, 12):
+        if c4i not in (4, 5, 12):
             sideeffect_reason = "c4_not_in_7e54_set"
             gate_trace.append(
                 {
@@ -1559,9 +1635,14 @@ def render_wmaze_pass_experimental(
                         )
                     continue
             call_rows = handler_call_map.get(helper, {}).get(draw_idx, [])
+            selector_trace = None
             if helper == "0x8D07" and not call_rows:
-                # 8D07 is not class-switched in our extractor; use all bp offsets in this pass.
-                call_rows = [{"bp_offset_primary": k, "depth_add": True, "imm_primary": None} for k in sorted(p.get("immediate_by_bp_offset", {}).keys())]
+                call_rows, selector_trace = _resolve_8d07_call_rows(
+                    pass_rec=p,
+                    depth_index=di,
+                    visible_details=visible_details,
+                    facing_idx=facing_idx,
+                )
             if not call_rows:
                 gate_trace.append(
                     {
@@ -1574,6 +1655,7 @@ def render_wmaze_pass_experimental(
                         "draw_index": draw_idx,
                         "wall_value": wallv,
                         "gate_skip_reason": "no_handler_call_rows",
+                        "selector_trace": selector_trace,
                         "gate_before": _gate_snapshot(di),
                         "markers_before": _marker_window_snapshot(di),
                         "loop_depth_limit": int(loop_depth_limit),
@@ -1617,6 +1699,7 @@ def render_wmaze_pass_experimental(
                         "draw_index": draw_idx,
                         "wall_value": wallv,
                         "gate_skip_reason": "no_record_indices_resolved",
+                        "selector_trace": selector_trace,
                         "gate_before": _gate_snapshot(di),
                         "markers_before": _marker_window_snapshot(di),
                         "loop_depth_limit": int(loop_depth_limit),
@@ -1664,6 +1747,7 @@ def render_wmaze_pass_experimental(
                         "records": kept,
                         "missing_records": missing_imgs[:16],
                         "missing_records_count": len(missing_imgs),
+                        "selector_trace": selector_trace,
                         "gate_before": _gate_snapshot(di),
                         "gate_after": _gate_snapshot(di),
                         "markers_before": _marker_window_snapshot(di),
@@ -1685,6 +1769,7 @@ def render_wmaze_pass_experimental(
                         "pass_index": pidx,
                         "call_site": p.get("draw_call_site"),
                         "cleanup_target": cleanup_target or None,
+                        "selector_trace": selector_trace,
                         "gate_skip_reason": None,
                     }
                 )
