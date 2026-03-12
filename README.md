@@ -43,6 +43,11 @@ Here are some things that are kind of working. They assume that you have the ori
 
 <img src="./media/font.png">
 
+### Messages:
+ `python -m loaders.message_parser 10010`
+ 
+ <img src="./media/msg.png">
+
 # Usage of AI tools
 This repo uses many AI tools including Codex, Claude, and Gemini. LLMs are extremely effective reverse engineering tools in many different ways, including:
  - Binary disassembly and logic analysis
