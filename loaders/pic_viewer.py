@@ -24,6 +24,31 @@ from bane.data.sprite_decoder import (
 )
 
 
+def _load_file(path: Path, args) -> tuple[list, int]:
+    """Load frames from a .PIC or .EGA file. Returns (frames, frame_index)."""
+    plane_order = [int(ch) for ch in args.plane_order.strip()]
+    msb_first = not args.lsb_first
+
+    if path.suffix.lower() == ".ega":
+        frames = decode_ega_frames(path)
+        if not frames:
+            frames = [decode_ega_file(path)]
+    else:
+        frames = decode_pic_frames(data=path.read_bytes(), header_skip=args.header_skip, msb_first=msb_first)
+        if not frames:
+            frames = [decode_pic_file(
+                str(path),
+                width=args.width,
+                height=args.height,
+                layout=args.layout,
+                header_skip=args.header_skip,
+                plane_order=plane_order,
+            )]
+
+    frame_index = max(0, min(args.frame, len(frames) - 1))
+    return frames, frame_index
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="bane-pic",
@@ -74,49 +99,26 @@ def main() -> None:
         help="Palette index to treat as transparent (default: 15 for .PIC, none for .EGA)",
     )
     args = parser.parse_args()
-    plane_order = [int(ch) for ch in args.plane_order.strip()]
 
     if args.lsb_first and args.msb_first:
         raise SystemExit("Choose only one of --msb-first or --lsb-first")
-    msb_first = not args.lsb_first
 
-    if args.file.suffix.lower() == ".ega":
-        frames = decode_ega_frames(args.file)
-        if frames:
-            frame_index = max(0, min(args.frame, len(frames) - 1))
-            sprite = frames[frame_index]
-        else:
-            sprite = decode_ega_file(args.file)
-            frames = [sprite]
-            frame_index = 0
-    else:
-        # .PIC file handling
-        frames = decode_pic_frames(
-            data=args.file.read_bytes(),
-            header_skip=args.header_skip,
-            msb_first=msb_first,
-        )
-        if frames:
-            frame_index = max(0, min(args.frame, len(frames) - 1))
-            sprite = frames[frame_index]
-        else:
-            frame_index = 0
-            frames = []
-            sprite = decode_pic_file(
-                str(args.file),
-                width=args.width,
-                height=args.height,
-                layout=args.layout,
-                header_skip=args.header_skip,
-                plane_order=plane_order,
-            )
+    # Build sorted list of sibling files with the same extension for Up/Down navigation
+    current_file = args.file.resolve()
+    sibling_files = sorted(
+        current_file.parent.glob(f"*{current_file.suffix}"),
+        key=lambda p: p.name.lower(),
+    )
+    file_index = next((i for i, p in enumerate(sibling_files) if p == current_file), 0)
+
+    frames, frame_index = _load_file(current_file, args)
+    sprite = frames[frame_index]
 
     pygame.init()
     scale = max(1, args.scale)
-    win_w = max(640, sprite.width * scale + 40)
-    win_h = max(480, sprite.height * scale + 80)
+    win_w, win_h = 640, 480
     screen = pygame.display.set_mode((win_w, win_h))
-    pygame.display.set_caption(f"Bane Engine — {args.file.name}")
+    pygame.display.set_caption(f"Bane Engine — {current_file.name}")
     font = pygame.font.Font(None, 20)
 
     running = True
@@ -127,19 +129,31 @@ def main() -> None:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                elif frames and len(frames) > 1 and event.key in (pygame.K_RIGHT, pygame.K_SPACE):
+                elif event.key in (pygame.K_RIGHT, pygame.K_SPACE) and len(frames) > 1:
                     frame_index = (frame_index + 1) % len(frames)
                     sprite = frames[frame_index]
-                elif frames and len(frames) > 1 and event.key == pygame.K_LEFT:
+                elif event.key == pygame.K_LEFT and len(frames) > 1:
                     frame_index = (frame_index - 1) % len(frames)
                     sprite = frames[frame_index]
+                elif event.key == pygame.K_UP and len(sibling_files) > 1:
+                    file_index = (file_index - 1) % len(sibling_files)
+                    current_file = sibling_files[file_index]
+                    frames, frame_index = _load_file(current_file, args)
+                    sprite = frames[frame_index]
+                    pygame.display.set_caption(f"Bane Engine — {current_file.name}")
+                elif event.key == pygame.K_DOWN and len(sibling_files) > 1:
+                    file_index = (file_index + 1) % len(sibling_files)
+                    current_file = sibling_files[file_index]
+                    frames, frame_index = _load_file(current_file, args)
+                    sprite = frames[frame_index]
+                    pygame.display.set_caption(f"Bane Engine — {current_file.name}")
 
         screen.fill((20, 20, 30))
 
         scaled = sprite.scale(scale)
         transparent_index = args.transparent
         if transparent_index is None:
-            transparent_index = 15 if args.file.suffix.lower() == ".pic" else -1
+            transparent_index = 15 if current_file.suffix.lower() == ".pic" else -1
         rgba = scaled.to_rgba_bytes(transparent_index=transparent_index)
         surf = pygame.image.frombuffer(rgba, (scaled.width, scaled.height), "RGBA")
 
@@ -147,21 +161,16 @@ def main() -> None:
         y = (win_h - scaled.height) // 2
         screen.blit(surf, (x, y))
 
-        if frames and len(frames) > 1:
-            info = (
-                f"{args.file.name} frame {frame_index + 1}/{len(frames)} "
-                f"({sprite.width}x{sprite.height}) skip={args.header_skip}"
-            )
+        file_info = f"{current_file.name} ({file_index + 1}/{len(sibling_files)})"
+        if len(frames) > 1:
+            frame_info = f"frame {frame_index + 1}/{len(frames)} ({sprite.width}x{sprite.height})"
         else:
-            info = (
-                f"{args.file.name} ({sprite.width}x{sprite.height}) "
-                f"[{args.layout} order={args.plane_order} skip={args.header_skip}]"
-            )
-        text_surf = font.render(info, True, (200, 200, 200))
+            frame_info = f"{sprite.width}x{sprite.height}"
+        text_surf = font.render(f"{file_info}  {frame_info}", True, (200, 200, 200))
         screen.blit(text_surf, (10, 10))
 
-        controls_text = "ESC: Quit"
-        if frames and len(frames) > 1:
+        controls_text = "ESC: Quit  Up/Down: File"
+        if len(frames) > 1:
             controls_text += "  Left/Right/Space: Frame"
         controls = font.render(controls_text, True, (120, 120, 120))
         screen.blit(controls, (10, win_h - 30))
