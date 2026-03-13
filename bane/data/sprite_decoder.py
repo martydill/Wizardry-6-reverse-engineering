@@ -560,7 +560,7 @@ def decode_ega_file(path: str | Path) -> Sprite:
     elif len(data) == 4096 and "WPORT" in path.name.upper():
         # Character portrait collection
         # 14 portraits of 24x24 tiled planar (14 * 288 = 4032 bytes)
-        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+        decoder = EGADecoder(palette=list(TITLEPAG_PALETTE))
         return decoder.decode_tiled_planar(
             data[:288],
             width=24,
@@ -617,7 +617,7 @@ def decode_ega_frames(path: str | Path) -> list[Sprite]:
         # pixel data starts at 0x800 in sequential planar EGA format.
         frames.extend(decode_mazedata_tiles(path))
     elif len(data) == 4096 and "WPORT" in path.name.upper():
-        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+        decoder = EGADecoder(palette=list(TITLEPAG_PALETTE))
         # 14 frames of 24x24 tiled planar (288 bytes each)
         for i in range(14):
             offset = i * 288
