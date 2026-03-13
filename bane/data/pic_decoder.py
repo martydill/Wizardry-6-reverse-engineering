@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import struct
 
-from bane.data.sprite_decoder import DEFAULT_16_PALETTE, Sprite, EGADecoder
+from bane.data.sprite_decoder import DEFAULT_16_PALETTE, TITLEPAG_PALETTE, Sprite, EGADecoder
 
 
 PIC_DATA_SIZE = 0x5800
@@ -180,7 +180,7 @@ def decode_pic_frames(
                     payload_ptr += 32
         
         # Tiles are stored row-major: tile 0=top-left, 1=top-right, 2=next-row-left, etc.
-        decoder = EGADecoder(palette=list(DEFAULT_16_PALETTE))
+        decoder = EGADecoder(palette=list(TITLEPAG_PALETTE))
         sprite = decoder.decode_tiled_planar(bytes(full_data), width, height, msb_first=msb_first)
         
         frames.append(sprite)
