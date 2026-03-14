@@ -38,44 +38,43 @@ class PicHeader:
 def _decode_rle(data: bytes) -> bytes:
     """Decode Wizardry 6 RLE compression.
 
-    Based on the reference implementation at:
+    Exact port of the reference implementation:
     https://github.com/kirbunkle/wizardry6PicUnpacker
 
+    The compressor writes the file in 0x1000-byte chunks. Each chunk starts with
+    a control byte, and the decompressor reads the file 0x1000 bytes at a time,
+    processing only bytes at indices 0..0x0FFE (i < 0x0FFF) as potential control
+    bytes within each chunk. 0x00 is a true end-of-stream terminator.
+
     Encoding rules:
-      * 0x00: Terminator (end of data)
-      * Byte with bit 7 clear (< 0x80): Read next N literal bytes
-      * Byte with bit 7 set (>= 0x80): Repeat next byte (-N) times (two's complement)
-        Example: 0xFF = -1 = repeat 1 time, 0xFE = -2 = repeat 2 times
-    
-    This implementation handles concatenated RLE streams by continuing to process
-    until the end of the input data.
+      * 0x00: End of stream — stop decompression
+      * Byte with bit 7 clear (0x01–0x7F): Read next N literal bytes
+      * Byte with bit 7 set  (0x80–0xFF): Repeat next byte (256 - N) times
     """
+    CHUNK = 0x1000
     out = bytearray()
-    i = 0
+    done = False
+    offset = 0
 
-    while i < len(data):
-        ctrl = data[i]
-        i += 1
-
-        if ctrl == 0x00:
-            # Terminator for one stream; continue to next if more data remains
-            continue
-        elif (ctrl & 0x80) == 0x00:
-            # Positive byte: read next N literal bytes
-            count = ctrl
-            for _ in range(count):
-                if i < len(data):
-                    out.append(data[i])
-                    i += 1
-        else:
-            # Negative byte: repeat next byte -N times (using two's complement)
-            if i < len(data):
-                value = data[i]
-                i += 1
-                # Treat ctrl as signed byte: values 128-255 represent -128 to -1
-                # Repeat count is the absolute value: 256 - ctrl
-                count = 256 - ctrl
-                out.extend([value] * count)
+    while not done and offset < len(data):
+        chunk = data[offset:offset + CHUNK]
+        offset += CHUNK
+        i = 0
+        while i < 0x0FFF:
+            if i >= len(chunk):
+                break
+            ctrl = chunk[i]; i += 1
+            if ctrl == 0x00:
+                done = True
+                break
+            elif (ctrl & 0x80) == 0x00:
+                for _ in range(ctrl):
+                    if i < len(chunk):
+                        out.append(chunk[i]); i += 1
+            else:
+                if i < len(chunk):
+                    value = chunk[i]; i += 1
+                    out.extend([value] * (256 - ctrl))
 
     return bytes(out)
 
