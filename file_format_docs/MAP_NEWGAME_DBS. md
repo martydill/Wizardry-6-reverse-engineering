@@ -1,0 +1,436 @@
+# NEWGAME.DBS — World Map File Format
+
+Applies to: `NEWGAME.DBS` (and `SAVEGAME.DBS`, which uses the same layout)
+
+## Overview
+
+`NEWGAME.DBS` is the primary map data file loaded by `WBASE.OVR` at game start.
+It stores all dungeon map records: wall geometry, block placement, and in-world
+feature placement (stairs, fountains, sconces, pressure plates, etc.).
+
+The file is a flat binary. There is no compression. Integers are little-endian
+throughout.
+
+---
+
+## Top-Level File Layout
+
+```
+Offset              Size            Contents
+------              ----            --------
+0x0000              0x019E          File header (index / global data)
+0x019E              N × 0x0C0E      Map records  (N = number of maps)
+end - 0x42          0x0042          Trailing state blob (runtime globals)
+```
+
+For the shipped game file (`NEWGAME.DBS`):
+
+- **16 map records** are present (map IDs 0 – 13 populated, 14–15 empty)
+- **Total file size**: `0x019E + 16 × 0x0C0E + 0x42 = 0x0C2C0` bytes
+
+### Record addressing
+
+```
+record_base(map_id) = 0x019E + map_id × 0x0C0E
+```
+
+All per-record offsets below are relative to `record_base(map_id)`.
+
+### Chunk decomposition
+
+Each `0x0C0E`-byte map record is loaded as two back-to-back chunks by the
+game's `WMAZE.OVR` staging path:
+
+| Chunk | Size     | Loader global |
+|-------|----------|---------------|
+| A     | `0x0542` | `[0x3304]`    |
+| B     | `0x06CC` | `[0x3306]`    |
+
+Both chunks land in a contiguous runtime buffer (`[0x4FAA]`). All record
+offsets below refer to the combined buffer, i.e. chunk A occupies `+0x000`
+through `+0x0541`; chunk B continues from `+0x0542`.
+
+---
+
+## Map Record Structure
+
+### Overview table
+
+| Offset in record | Size (bytes) | Description                             |
+|------------------|:------------:|-----------------------------------------|
+| `+0x0060`        | `0x00C0`     | Wall plane A — packed 2-bit south-edges |
+| `+0x0120`        | `0x00C0`     | Wall plane B — packed 2-bit east-edges  |
+| `+0x01E0`        | `0x000C`     | Block X-origin table (12 entries)       |
+| `+0x01EC`        | `0x000C`     | Block Y-origin table (12 entries)       |
+| `+0x01F8`        | `0x0080`     | Feature grid bank 0 (blocks 0–3)        |
+| `+0x0278`        | `0x0080`     | Feature grid bank 1 (blocks 4–7)        |
+| `+0x02F8`        | `0x0080`     | Feature grid bank 2 (blocks 8–11)       |
+
+Offsets in the `0x0042`-range and the un-catalogued region between
+`+0x0300` and the end of chunk B contain additional runtime state whose
+layout has not been fully decoded.
+
+---
+
+## Block System
+
+Each map is divided into up to **12 blocks**, numbered 0–11. Every block
+covers an **8×8 tile region** in world space.
+
+### Block disable rule
+
+A block is **disabled** when its origin is `(0, 0)`. The renderer skips
+disabled blocks entirely. Only blocks with a non-zero origin are active.
+
+> **Exception**: block 0 of a map may legitimately begin at world origin (0,0);
+> in practice, maps with a block at (0,0) rely on other context to distinguish it
+> from an absent block.
+
+### Block-local indexing
+
+Within a block, cells are addressed by `(row, col)`, both 0–7. The flat index
+used in all packed arrays is:
+
+```
+idx = (block × 64) + (row × 8) + col
+```
+
+Total entries across 12 blocks: 768.
+
+---
+
+## Block Origin Tables (`+0x01E0` / `+0x01EC`)
+
+Two 12-byte arrays, one byte per block.
+
+```
++0x01E0  [12 bytes]  x_origins[0..11]
++0x01EC  [12 bytes]  y_origins[0..11]
+```
+
+`x_origins[b]` and `y_origins[b]` give the **world-space top-left corner** of
+block `b`.
+
+World position of tile `(row, col)` inside block `b`:
+
+```
+world_x = x_origins[b] + col
+world_y = y_origins[b] + row
+```
+
+### World-to-block resolver
+
+To map a world coordinate `(wx, wy)` back to `(block, row, col)`:
+
+```python
+for b in range(12):
+    ox, oy = x_origins[b], y_origins[b]
+    if ox <= wx <= ox + 7 and oy <= wy <= oy + 7:
+        return b, wy - oy, wx - ox
+return None   # out of bounds
+```
+
+---
+
+## Wall Planes (`+0x0060` and `+0x0120`)
+
+### Format
+
+Each plane stores 768 **2-bit fields** packed consecutively, most-significant
+pair first within each byte:
+
+```
+byte = data[plane_start + (idx // 4)]
+field = (byte >> ((idx % 4) * 2)) & 0x03
+```
+
+where `idx = block×64 + row×8 + col` and `plane_start` is `+0x0060` or
+`+0x0120`.
+
+Total storage: 768 × 2 bits = 1536 bits = **192 bytes** per plane (`0xC0`).
+
+### Plane semantics
+
+| Plane          | Offset    | Represents                                                    |
+|----------------|-----------|---------------------------------------------------------------|
+| **Plane A**    | `+0x0060` | South edge of cell `(block, row, col)` — boundary toward `row+1` |
+| **Plane B**    | `+0x0120` | East edge of cell `(block, row, col)` — boundary toward `col+1`  |
+
+Together the two planes encode every cell-to-cell boundary in the map. Each
+interior edge is owned by exactly one cell (the cell with the lower coordinate
+in the relevant axis).
+
+### Wall field values
+
+| Value | Meaning                              |
+|-------|--------------------------------------|
+| `0`   | Open — no obstacle                   |
+| `1`   | Special passage (passage-type marker)|
+| `2`   | Solid wall                           |
+| `3`   | Door / special door                  |
+
+### Accessing all four edges of a tile
+
+Because plane A owns the south edge and plane B owns the east edge, the other
+two edges must be read from neighboring cells:
+
+| Edge direction | How to read it                                          |
+|----------------|---------------------------------------------------------|
+| South          | `plane_A[block, row, col]` (direct)                    |
+| East           | `plane_B[block, row, col]` (direct)                    |
+| North          | `plane_A` of cell `(row-1, col)` in the same or adjacent block |
+| West           | `plane_B` of cell `(row, col-1)` in the same or adjacent block |
+
+The renderer uses four **accessor modes** (0–3) to abstract this:
+
+```python
+def wall_mode_value(a_vals, b_vals, origins, map_id, block, row, col, mode):
+    if mode == 0:   # south
+        return a_vals[block][row][col]
+    if mode == 1:   # east
+        return b_vals[block][row][col]
+    # modes 2 and 3 resolve across block boundaries via world-to-block resolver
+    ox, oy = origins[block]
+    wx, wy = ox + col, oy + row
+    if mode == 2:   # north: look up (wx, wy-1)
+        res = resolve_world_cell(origins, wx, wy - 1)
+    else:           # west:  look up (wx-1, wy)
+        res = resolve_world_cell(origins, wx - 1, wy)
+    if res is None:
+        return 0 if map_id in (0x0A, 0x0C) else 2   # OOB rule (see below)
+    rb, rr, rc = res
+    return a_vals[rb][rr][rc] if mode == 2 else b_vals[rb][rr][rc]
+```
+
+### Out-of-bounds wall rule
+
+When a cross-block lookup falls outside every active block's bounding box:
+
+- **Map IDs `0x0A` (10) and `0x0C` (12)**: OOB edge treated as **open** (value `0`)
+- **All other maps**: OOB edge treated as **solid wall** (value `2`)
+
+This is a deliberate game-engine rule recovered from `WMAZE.OVR` disassembly.
+
+### Building tile boundaries for rendering
+
+The full set of drawable edges for an 8×8 block is:
+
+```python
+def build_block_boundaries(a_vals, b_vals, origins, map_id, block):
+    # h[y][x] = True if there is a horizontal (east-west) line at grid row y, column x
+    # v[y][x] = True if there is a vertical  (north-south) line at grid column x, row y
+    h = [[False] * 8 for _ in range(9)]   # 9 rows × 8 cols
+    v = [[False] * 9 for _ in range(8)]   # 8 rows × 9 cols
+    for y in range(9):
+        for x in range(8):
+            mode = 2 if y == 0 else 0   # top border = north lookup; others = south
+            val = wall_mode_value(a_vals, b_vals, origins, map_id, block,
+                                  max(0, y-1), x, mode)
+            h[y][x] = (val != 0)
+    for y in range(8):
+        for x in range(9):
+            mode = 3 if x == 0 else 1   # left border = west lookup; others = east
+            val = wall_mode_value(a_vals, b_vals, origins, map_id, block,
+                                  y, max(0, x-1), mode)
+            v[y][x] = (val != 0)
+    return h, v
+```
+
+---
+
+## Feature Grids (`+0x01F8`, `+0x0278`, `+0x02F8`)
+
+### Purpose
+
+The feature grids record interactive map objects (stairs, fountains, sconces,
+pressure plates, etc.) that occupy individual tiles.
+
+### Bank → block mapping
+
+Three 128-byte banks, each responsible for four contiguous blocks:
+
+| Bank | Offset in record | Blocks covered |
+|------|-----------------|----------------|
+| 0    | `+0x01F8`       | Blocks 0–3     |
+| 1    | `+0x0278`       | Blocks 4–7     |
+| 2    | `+0x02F8`       | Blocks 8–11    |
+
+### Global grid layout within a bank
+
+Each bank is decoded as a **16×16 tile grid**, split into **four 8×8
+quadrants**:
+
+```
+Quadrant layout in bank (2×2):
+  Q0 (top-left)    = block (bank×4 + 0)   world region (qx=0, qy=0)
+  Q1 (top-right)   = block (bank×4 + 1)   world region (qx=1, qy=0)
+  Q2 (bottom-left) = block (bank×4 + 2)   world region (qx=0, qy=1)
+  Q3 (bottom-right)= block (bank×4 + 3)   world region (qx=1, qy=1)
+```
+
+Quadrants are stored **sequentially**: Q0 first (bytes 0–31), Q1 (32–63),
+Q2 (64–95), Q3 (96–127).
+
+### Cell encoding within a quadrant
+
+Each quadrant contains 64 cells in **row-major order** (left-to-right, then
+top-to-bottom within the 8×8 quadrant). Cells are packed **two per byte**:
+
+```
+local_idx = ly × 8 + lx          (lx, ly = 0..7 within the quadrant)
+byte      = bank_data[q_idx × 32 + local_idx // 2]
+value     = (byte & 0x0F) if (local_idx % 2 == 0) else ((byte >> 4) & 0x0F)
+```
+
+- **Even local index** → low nibble (`bits 0–3`)
+- **Odd local index** → high nibble (`bits 4–7`)
+
+### Python decoder
+
+```python
+def decode_feature_grid(data, record_base, offset_in_record):
+    """Decode one 128-byte feature bank into a 16×16 grid of 4-bit values."""
+    f = data[record_base + offset_in_record : record_base + offset_in_record + 128]
+    grid = [[0] * 16 for _ in range(16)]
+    for qy in range(2):
+        for qx in range(2):
+            q_idx = qy * 2 + qx
+            q_base = q_idx * 32
+            for ly in range(8):
+                for lx in range(8):
+                    local_idx = ly * 8 + lx
+                    b = f[q_base + local_idx // 2]
+                    val = (b & 0x0F) if (local_idx % 2 == 0) else ((b >> 4) & 0x0F)
+                    grid[qy * 8 + ly][qx * 8 + lx] = val
+    return grid
+```
+
+### Mapping feature cells to world coordinates
+
+```python
+BANK_OFFSETS = (0x01F8, 0x0278, 0x02F8)
+
+for bank_idx, off in enumerate(BANK_OFFSETS):
+    grid = decode_feature_grid(data, base, off)
+    for q in range(4):
+        block = bank_idx * 4 + q
+        if not block_enabled(origins, block):
+            continue
+        qx, qy = q % 2, q // 2
+        ox, oy = x_origins[block], y_origins[block]
+        for ly in range(8):
+            for lx in range(8):
+                v = grid[qy * 8 + ly][qx * 8 + lx]
+                if v != 0:
+                    world_x = ox + lx
+                    world_y = oy + ly
+                    # feature v at (world_x, world_y)
+```
+
+---
+
+## Feature ID Reference
+
+| ID    | Feature          | Description                                   |
+|-------|------------------|-----------------------------------------------|
+| `0x0` | Empty            | No feature (ignore)                           |
+| `0x1` | Stairs Up        | Staircase ascending to the level above        |
+| `0x2` | Stairs Down      | Staircase descending to the level below       |
+| `0x3` | Sconce           | Wall-mounted torch or light source            |
+| `0x4` | Fountain         | Interactive water fountain                    |
+| `0x5` | Secret Button    | Hidden wall trigger                           |
+| `0x6` | Pressure Plate   | Floor-mounted switch                          |
+| `0x7` | Portcullis       | Iron gate / portcullis                        |
+| `0x8` | Shackles         | Wall-mounted chains                           |
+| `0x9` | Niche            | Wall alcove / niche                           |
+| `0xA` | (niche variant)  | Niche with blue-box graphic                   |
+| `0xB` | (niche variant)  | Niche with red-box graphic                    |
+| `0xC` | (niche variant)  | Niche with bones graphic                      |
+| `0xD` | Fake Water       | Decorative / trap water floor                 |
+| `0xE` | Pit Down         | Hole in the floor (fall to level below)       |
+| `0xF` | Pit Up           | Hole in the ceiling (from level below)        |
+
+IDs `0xA`–`0xF` are confirmed as having distinct rendering colors in the
+reference renderer but their exact in-game behavior has not been fully
+verified.
+
+---
+
+## Trailing State Blob (`0x42` bytes)
+
+The 66-byte blob immediately after all map records holds game-state globals
+serialized at save time. The loader copies these into fixed memory addresses:
+
+| Word offset in blob | Destination global | Meaning                          |
+|--------------------:|:------------------:|----------------------------------|
+| `w00`               | `0x363C`           | Active map ID                    |
+| `w01..w13`          | `0x4FA4`–`0x4F8C`  | World anchor / origin state      |
+| `w20`/`w21`         | `0x4F80`/`0x4F82`  | 32-bit pair (purpose TBD)        |
+| `w22`/`w23`         | `0x4F7C`/`0x4F7E`  | 32-bit pair (purpose TBD)        |
+| `w24`/`w25`         | `0x4F78`/`0x4F7A`  | 32-bit pair (purpose TBD)        |
+| `w32`               | `0x43CE`           | Block-record count for load loop |
+
+In `NEWGAME.DBS`, `w32 = 0` and there is no trailing block-record section.
+A non-zero `w32` would signal additional `0x1B0`-byte block records following
+the state blob.
+
+---
+
+## File Size Verification
+
+For a file with `N` maps and no trailing block records:
+
+```
+expected_size = 0x019E + N × 0x0C0E + 0x42
+```
+
+The shipped `NEWGAME.DBS` with N=16:
+
+```
+0x019E + 16 × 0x0C0E + 0x42
+= 414 + 16 × 3086 + 66
+= 414 + 49376 + 66
+= 49856
+= 0x0C2C0 bytes
+```
+
+---
+
+## Reference Implementation
+
+`loaders/render_map_walls_reconstructed.py` is the canonical decoding
+reference. It implements:
+
+- `record_base(map_id)` — record offset formula
+- `decode_wall_planes(data, base)` — 2-bit plane unpacker
+- `decode_origins(data, base)` — origin table reader
+- `decode_features_by_block(data, base, origins)` — feature grid decoder
+- `wall_mode_value(...)` — 4-mode edge accessor with OOB rule
+- `build_mode_boundaries(...)` — full block boundary builder
+- `resolve_world_cell(origins, wx, wy)` — world-to-block resolver
+
+Run with:
+
+```
+python loaders/render_map_walls_reconstructed.py --map-id 8
+```
+
+Arrow keys cycle through all maps; Esc quits.
+
+---
+
+## Known Unknowns
+
+The following regions of the map record have not been fully decoded:
+
+- **`+0x0000` to `+0x005F`**: Purpose unknown (precedes wall planes)
+- **`+0x0180` to `+0x01DF`**: 96 bytes between wall planes and origin tables
+- **`+0x0377` to `+0x0541`** (end of chunk A): Unknown
+- **Chunk B (`+0x0542` to `+0x0C0D`)**: Mostly undecoded; contains additional
+  packed bitfields at `+0x043A` (768 × 1-bit), `+0x049A` (768 × 1-bit),
+  `+0x04FA` (60 × 3-bit), and `+0x0512` (60 × 3-bit) — likely encounter flags,
+  door state, and entity data
+- **Wall value `1` vs `3`** exact behavioral distinction: `1` appears to mark a
+  passage-type special edge; `3` appears to mark a door-type edge, but the
+  full game logic for locked doors, one-way passages, and secret doors has not
+  been traced from source
