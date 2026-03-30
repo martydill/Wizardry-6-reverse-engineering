@@ -51,6 +51,9 @@ Here are some things that are kind of working. They assume that you have the ori
  
 <img src="./media/msg.png">
 
+#### Sounds: 
+`python -m loaders.sound_player gamedata/sound02.snd`
+
 # Usage of AI tools
 This repo uses many AI tools including Codex, Claude, and Gemini. LLMs are extremely effective reverse engineering tools in many different ways, including:
  - Binary disassembly and logic analysis
