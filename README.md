@@ -51,6 +51,11 @@ Here are some things that are kind of working. They assume that you have the ori
  
 <img src="./media/msg.png">
 
+#### Character Roster:
+`python loaders/pc_viewer.py gamedata/PCFILE.dbs`
+
+<img src="./media/pc.png">
+
 #### Sounds: 
 `python -m loaders.sound_player gamedata/sound02.snd`
 

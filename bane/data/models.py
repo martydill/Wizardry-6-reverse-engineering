@@ -227,6 +227,7 @@ class CharacterData:
     level: int = 1
     experience: int = 0
     age: int = 18
+    age_raw: int = 0
     gold: int = 0
     kills: int = 0
     rebirths: int = 0  # number of class changes
@@ -239,9 +240,13 @@ class CharacterData:
 
     # Inventory (swag bag, up to 12 items)
     inventory: list[int] = field(default_factory=list)  # item IDs
+    inventory_raw: list[dict[str, int]] = field(default_factory=list)
 
     # Spells known (bitfield per school)
     spells_known: dict[SpellSchool, list[bool]] = field(default_factory=dict)
+    spell_bits_known_raw: dict[str, int] = field(default_factory=dict)
+    spell_bits_prepared_raw: dict[str, int] = field(default_factory=dict)
+    known_spell_ids: list[int] = field(default_factory=list)
 
     # Status
     conditions: Condition = Condition.NONE
