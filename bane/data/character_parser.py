@@ -48,6 +48,7 @@ from bane.data.pcfile_editor import (
     SKILL_NAMES,
     SPELL_KNOWN_BLOCK_OFFSET,
     SPELL_KNOWN_BLOCK_SIZE,
+    PORTRAIT_OFFSET,
     SPELL_SCHOOLS,
     STAMINA_OFFSET,
     STAT_BLOCK_OFFSET,
@@ -85,6 +86,78 @@ def _iter_inventory_entries(record_data: bytes | bytearray) -> list[tuple[int, b
         entries.append((idx, record_data[off:off + 8]))
 
     return entries
+
+
+def parse_pcfile_record(record) -> CharacterData:
+    """Parse one PCFILE-format record object into CharacterData.
+
+    The input must expose `.name` and `.data` like `PCCharacterRecord`.
+    """
+    data = record.data
+    char = CharacterData()
+
+    char.name = record.name
+    char.race = Race(data[RACE_OFFSET] % len(Race))
+    char.sex = Sex.FEMALE if data[0x19E] else Sex.MALE
+    char.profession = Profession(data[CLASS_OFFSET] % len(Profession))
+    char.portrait_id = data[PORTRAIT_OFFSET]
+
+    stats = data[STAT_BLOCK_OFFSET:STAT_BLOCK_OFFSET + 8]
+    char.strength = stats[0]
+    char.intelligence = stats[1]
+    char.piety = stats[2]
+    char.vitality = stats[3]
+    char.dexterity = stats[4]
+    char.speed = stats[5]
+    char.personality = stats[6]
+
+    char.hp_current = _u16(data, HP_OFFSET)
+    char.hp_max = _u16(data, HP_OFFSET + 2)
+    char.stamina_current = _u16(data, STAMINA_OFFSET)
+    char.stamina_max = _u16(data, STAMINA_OFFSET + 2)
+
+    char.age_raw = _u32(data, AGE_RAW_OFFSET)
+    char.age = char.age_raw
+    char.current_weight = _u16(data, GOLD_OFFSET)
+    char.carrying_capacity = _u16(data, XP_OFFSET)
+
+    for skill in Skill:
+        char.skills[skill] = 0
+    for skill, indices in SKILL_INDEX_MAP.items():
+        vals = [data[0x134 + idx] for idx in indices if 0x134 + idx < len(data)]
+        char.skills[skill] = max(vals) if vals else 0
+
+    for slot in EquipSlot:
+        char.equipment[slot] = None
+
+    for school_name, offset in SPELL_SCHOOLS:
+        char.spell_bits_known_raw[school_name] = _u16(data, offset)
+        char.spell_bits_prepared_raw[school_name] = _u16(data, offset + 2)
+    char.known_spell_ids = known_spell_ids_from_block(
+        data,
+        offset=SPELL_KNOWN_BLOCK_OFFSET,
+        size=SPELL_KNOWN_BLOCK_SIZE,
+    )
+
+    for slot_index, entry in _iter_inventory_entries(data):
+        item_id = _u16(entry, 0)
+        if item_id <= 0:
+            continue
+        char.inventory.append(item_id)
+        char.inventory_raw.append(
+            {
+                "slot_index": slot_index,
+                "item_id": item_id,
+                "weight_tenths": _u16(entry, 2),
+                "field4": entry[4],
+                "field5": entry[5],
+                "field6": entry[6],
+                "field7": entry[7],
+            }
+        )
+
+    char.conditions = Condition.NONE
+    return char
 
 
 SKILL_INDEX_MAP: dict[Skill, tuple[int, ...]] = {
@@ -129,70 +202,7 @@ class CharacterParser:
         return characters
 
     def _parse_record(self, record) -> CharacterData:
-        data = record.data
-        char = CharacterData()
-
-        char.name = record.name
-        char.race = Race(data[RACE_OFFSET] % len(Race))
-        char.sex = Sex.FEMALE if data[0x19E] else Sex.MALE
-        char.profession = Profession(data[CLASS_OFFSET] % len(Profession))
-
-        stats = data[STAT_BLOCK_OFFSET:STAT_BLOCK_OFFSET + 8]
-        char.strength = stats[0]
-        char.intelligence = stats[1]
-        char.piety = stats[2]
-        char.vitality = stats[3]
-        char.dexterity = stats[4]
-        char.speed = stats[5]
-        char.personality = stats[6]
-
-        char.hp_current = _u16(data, HP_OFFSET)
-        char.hp_max = _u16(data, HP_OFFSET + 2)
-        char.stamina_current = _u16(data, STAMINA_OFFSET)
-        char.stamina_max = _u16(data, STAMINA_OFFSET + 2)
-
-        char.age_raw = _u32(data, AGE_RAW_OFFSET)
-        char.age = char.age_raw
-        char.current_weight = _u16(data, GOLD_OFFSET)
-        char.carrying_capacity = _u16(data, XP_OFFSET)
-
-        for skill in Skill:
-            char.skills[skill] = 0
-        for skill, indices in SKILL_INDEX_MAP.items():
-            vals = [data[0x134 + idx] for idx in indices if 0x134 + idx < len(data)]
-            char.skills[skill] = max(vals) if vals else 0
-
-        for slot in EquipSlot:
-            char.equipment[slot] = None
-
-        for school_name, offset in SPELL_SCHOOLS:
-            char.spell_bits_known_raw[school_name] = _u16(data, offset)
-            char.spell_bits_prepared_raw[school_name] = _u16(data, offset + 2)
-        char.known_spell_ids = known_spell_ids_from_block(
-            data,
-            offset=SPELL_KNOWN_BLOCK_OFFSET,
-            size=SPELL_KNOWN_BLOCK_SIZE,
-        )
-
-        for slot_index, entry in _iter_inventory_entries(data):
-            item_id = _u16(entry, 0)
-            if item_id <= 0:
-                continue
-            char.inventory.append(item_id)
-            char.inventory_raw.append(
-                {
-                    "slot_index": slot_index,
-                    "item_id": item_id,
-                    "weight_tenths": _u16(entry, 2),
-                    "field4": entry[4],
-                    "field5": entry[5],
-                    "field6": entry[6],
-                    "field7": entry[7],
-                }
-            )
-
-        char.conditions = Condition.NONE
-        return char
+        return parse_pcfile_record(record)
 
     def dump_characters(self) -> str:
         try:

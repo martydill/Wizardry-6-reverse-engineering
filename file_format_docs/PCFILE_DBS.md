@@ -72,6 +72,7 @@ Each character record is `0x01B0` bytes.
 | `0x152` | `0x036` | bytes | unknown | unresolved pre-spell-known block |
 | `0x188` | 12 | packed bits | confirmed | known-spell bitset, spell id = bit index |
 | `0x194` | `0x009` | bytes | unknown | unresolved late block |
+| `0x19C` | 1 | `u8` | confirmed | portrait index |
 | `0x19D` | 1 | `u8` | confirmed | race id |
 | `0x19E` | 1 | `u8` | confirmed | gender id |
 | `0x19F` | 1 | `u8` | confirmed | class id |
@@ -266,8 +267,32 @@ helpers with the actual spell id.
 
 ### Race, Gender, Class
 
+### Portrait Index
+
+- Offset: `0x19C`
+- type: `u8`
+- meaning: portrait index used by portrait drawing code
+
+`WBASE:0x5C1C..0x5C39` reads this byte from each character record and passes it
+into the portrait loader at `WBASE:0x4F8E`.
+
+`WBASE:0x4F8E` then:
+
+- opens `WPORT1.*`
+- divides the portrait index by `14`
+- uses the quotient/remainder to pick the portrait file/page and in-file slot
+
+So `0x19C` is a global portrait number, not just a local slot within one
+portrait file.
+
+Observed examples:
+
+- `THESUS` = `0`
+- `NOBAL` = `3`
+
 Offsets:
 
+- `0x19C` = portrait index
 - `0x19D` = race id
 - `0x19E` = gender id
 - `0x19F` = class id
