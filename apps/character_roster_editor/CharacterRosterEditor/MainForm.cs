@@ -1,0 +1,803 @@
+using System;
+using System.ComponentModel;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace CharacterRosterEditor;
+
+internal sealed class MainForm : Form
+{
+    private static readonly string[] SpellSchoolNames = { "Fire", "Water", "Air", "Earth", "Mental", "Magic" };
+
+    private readonly BindingList<CharacterRecord> _records = new BindingList<CharacterRecord>();
+
+    private readonly DataGridView _grid = new DataGridView();
+    private readonly TextBox _nameTextBox = new TextBox();
+    private readonly NumericUpDown _levelNumeric = new NumericUpDown();
+    private readonly NumericUpDown _rankNumeric = new NumericUpDown();
+    private readonly NumericUpDown _ageNumeric = new NumericUpDown();
+    private readonly NumericUpDown _hpCurNumeric = new NumericUpDown();
+    private readonly NumericUpDown _hpMaxNumeric = new NumericUpDown();
+    private readonly NumericUpDown _staminaCurNumeric = new NumericUpDown();
+    private readonly NumericUpDown _staminaMaxNumeric = new NumericUpDown();
+    private readonly NumericUpDown _loadCurNumeric = new NumericUpDown();
+    private readonly NumericUpDown _loadMaxNumeric = new NumericUpDown();
+    private readonly NumericUpDown _inventoryPage1Numeric = new NumericUpDown();
+    private readonly NumericUpDown _inventoryPage2Numeric = new NumericUpDown();
+    private readonly ComboBox _raceCombo = new ComboBox();
+    private readonly ComboBox _genderCombo = new ComboBox();
+    private readonly ComboBox _classCombo = new ComboBox();
+    private readonly FlowLayoutPanel _statsPanel = new FlowLayoutPanel();
+    private readonly DataGridView _spellPointsGrid = new DataGridView();
+    private readonly DataGridView _skillsGrid = new DataGridView();
+    private readonly DataGridView _inventoryGrid = new DataGridView();
+    private readonly TextBox _knownSpellsHexTextBox = new TextBox();
+
+    private string? _currentPath;
+    private PcfileDocument? _document;
+    private bool _isUpdatingUi;
+
+    public MainForm()
+    {
+        Text = "Wizardry 6 Character Roster Editor";
+        Width = 1500;
+        Height = 900;
+        StartPosition = FormStartPosition.CenterScreen;
+
+        BuildUi();
+        ApplyStyle();
+    }
+
+    private void BuildUi()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2,
+            Padding = new Padding(12),
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        Controls.Add(root);
+
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 4, 0, 0),
+        };
+
+        buttonPanel.Controls.Add(CreateButton("Open PCFILE.DBS", (_, __) => OpenFile()));
+        buttonPanel.Controls.Add(CreateButton("Save", (_, __) => SaveFile(false)));
+        buttonPanel.Controls.Add(CreateButton("Save As", (_, __) => SaveFile(true)));
+
+        root.Controls.Add(buttonPanel, 0, 0);
+        root.SetColumnSpan(buttonPanel, 2);
+
+        BuildRosterGrid();
+        root.Controls.Add(_grid, 0, 1);
+
+        var editorTabs = new TabControl { Dock = DockStyle.Fill };
+        editorTabs.TabPages.Add(new TabPage("Core") { Controls = { BuildCoreEditorPanel() } });
+        editorTabs.TabPages.Add(new TabPage("Spell Points") { Controls = { BuildSpellPointsPanel() } });
+        editorTabs.TabPages.Add(new TabPage("Skills") { Controls = { BuildSkillsPanel() } });
+        editorTabs.TabPages.Add(new TabPage("Inventory") { Controls = { BuildInventoryPanel() } });
+        editorTabs.TabPages.Add(new TabPage("Known Spells") { Controls = { BuildKnownSpellsPanel() } });
+
+        root.Controls.Add(editorTabs, 1, 1);
+    }
+
+    private void BuildRosterGrid()
+    {
+        _grid.Dock = DockStyle.Fill;
+        _grid.AutoGenerateColumns = false;
+        _grid.MultiSelect = false;
+        _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        _grid.AllowUserToAddRows = false;
+        _grid.AllowUserToDeleteRows = false;
+        _grid.DataSource = _records;
+        _grid.RowHeadersVisible = false;
+        _grid.CellClick += (_, __) => LoadSelectionIntoEditor();
+
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.SlotIndex), HeaderText = "Slot", Width = 50 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.Name), HeaderText = "Name", Width = 140 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.Level), HeaderText = "Level", Width = 60 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.Rank), HeaderText = "Rank", Width = 60 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Race", Width = 110, Name = "RaceDisplay" });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Class", Width = 110, Name = "ClassDisplay" });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.HitPointsCurrent), HeaderText = "HP", Width = 60 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.StaminaCurrent), HeaderText = "STM", Width = 60 });
+        _grid.CellFormatting += GridOnCellFormatting;
+    }
+
+    private Control BuildCoreEditorPanel()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16) };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoScroll = true };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        AddEditorRow(layout, 0, "Name", _nameTextBox);
+        AddEditorRow(layout, 1, "Age (Years)", ConfigureNumeric(_ageNumeric, 0, uint.MaxValue / 365u));
+        AddEditorRow(layout, 2, "Level", ConfigureNumeric(_levelNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 3, "Rank", ConfigureNumeric(_rankNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 4, "HP Current", ConfigureNumeric(_hpCurNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 5, "HP Max", ConfigureNumeric(_hpMaxNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 6, "Stamina Cur", ConfigureNumeric(_staminaCurNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 7, "Stamina Max", ConfigureNumeric(_staminaMaxNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 8, "Load Cur (x10)", ConfigureNumeric(_loadCurNumeric, 0, 65535));
+        AddEditorRow(layout, 9, "Load Max (x10)", ConfigureNumeric(_loadMaxNumeric, 0, 65535));
+
+        PopulateCombo(_raceCombo, LookupTables.Races);
+        PopulateCombo(_genderCombo, LookupTables.Genders);
+        PopulateCombo(_classCombo, LookupTables.Classes);
+
+        AddEditorRow(layout, 10, "Race", _raceCombo);
+        AddEditorRow(layout, 11, "Gender", _genderCombo);
+        AddEditorRow(layout, 12, "Class", _classCombo);
+        AddEditorRow(layout, 13, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
+        AddEditorRow(layout, 14, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
+
+        BuildStatsEditor();
+        AddEditorRow(layout, 15, "Stats", _statsPanel);
+
+        AddEditorRow(layout, 16, string.Empty, CreateButton("Apply Changes", (_, __) => ApplyEditorValues()));
+
+        WireEditorEvents();
+        panel.Controls.Add(layout);
+        return panel;
+    }
+
+    private void BuildStatsEditor()
+    {
+        _statsPanel.Dock = DockStyle.Fill;
+        _statsPanel.AutoSize = true;
+        _statsPanel.WrapContents = true;
+        _statsPanel.FlowDirection = FlowDirection.LeftToRight;
+
+        var statNames = new[] { "STR", "INT", "PIE", "VIT", "DEX", "SPD", "PER", "KAR" };
+        for (var i = 0; i < statNames.Length; i++)
+        {
+            var container = new Panel { Width = 90, Height = 64 };
+            var label = new Label { Text = statNames[i], Dock = DockStyle.Top, Height = 20, TextAlign = ContentAlignment.MiddleLeft };
+            var numeric = new NumericUpDown { Name = $"Stat{i}", Minimum = 0, Maximum = 255, Width = 80, Height = 28, Top = 26 };
+            numeric.ValueChanged += (_, __) => ApplyEditorValues();
+            container.Controls.Add(numeric);
+            container.Controls.Add(label);
+            _statsPanel.Controls.Add(container);
+        }
+    }
+
+    private Control BuildSpellPointsPanel()
+    {
+        ConfigureTableGrid(_spellPointsGrid);
+        _spellPointsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "School", ReadOnly = true, Width = 120 });
+        _spellPointsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Current", Width = 90 });
+        _spellPointsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Max", Width = 90 });
+        _spellPointsGrid.CellEndEdit += (_, __) => ApplySpellPointGrid();
+
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        panel.Controls.Add(_spellPointsGrid);
+        return panel;
+    }
+
+    private Control BuildSkillsPanel()
+    {
+        ConfigureTableGrid(_skillsGrid);
+        _skillsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Index", ReadOnly = true, Width = 60 });
+        _skillsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Label", ReadOnly = true, Width = 180 });
+        _skillsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Value", Width = 80 });
+        _skillsGrid.CellEndEdit += (_, __) => ApplySkillsGrid();
+
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        panel.Controls.Add(_skillsGrid);
+        return panel;
+    }
+
+    private Control BuildInventoryPanel()
+    {
+        ConfigureTableGrid(_inventoryGrid);
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Slot", ReadOnly = true, Width = 50 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "ItemId", Width = 80 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Load(x10)", Width = 80 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B4", Width = 60 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B5", Width = 60 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B6", Width = 60 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B7", Width = 60 });
+        _inventoryGrid.CellEndEdit += (_, __) => ApplyInventoryGrid();
+
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        panel.Controls.Add(_inventoryGrid);
+        return panel;
+    }
+
+    private Control BuildKnownSpellsPanel()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16) };
+        var label = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 48,
+            Text = "Known spells bitset hex (12 bytes / 24 hex chars, spell id = bit index).",
+        };
+
+        _knownSpellsHexTextBox.Dock = DockStyle.Top;
+        _knownSpellsHexTextBox.Height = 28;
+        _knownSpellsHexTextBox.TextChanged += (_, __) => ApplyKnownSpellsHex();
+
+        panel.Controls.Add(_knownSpellsHexTextBox);
+        panel.Controls.Add(label);
+        return panel;
+    }
+
+    private void WireEditorEvents()
+    {
+        _nameTextBox.TextChanged += (_, __) => ApplyEditorValues();
+        _levelNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _rankNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _ageNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _hpCurNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _hpMaxNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _staminaCurNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _staminaMaxNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _loadCurNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _loadMaxNumeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _raceCombo.SelectedIndexChanged += (_, __) => ApplyEditorValues();
+        _genderCombo.SelectedIndexChanged += (_, __) => ApplyEditorValues();
+        _classCombo.SelectedIndexChanged += (_, __) => ApplyEditorValues();
+        _inventoryPage1Numeric.ValueChanged += (_, __) => ApplyEditorValues();
+        _inventoryPage2Numeric.ValueChanged += (_, __) => ApplyEditorValues();
+    }
+
+    private void ApplyEditorValues()
+    {
+        if (_isUpdatingUi)
+        {
+            return;
+        }
+
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        selected.Name = _nameTextBox.Text;
+        selected.Level = (ushort)_levelNumeric.Value;
+        selected.Rank = (ushort)_rankNumeric.Value;
+        var targetAgeYears = (uint)_ageNumeric.Value;
+        if ((selected.AgeDays / 365u) != targetAgeYears)
+        {
+            selected.AgeDays = targetAgeYears * 365u;
+        }
+        selected.HitPointsCurrent = (ushort)_hpCurNumeric.Value;
+        selected.HitPointsMax = (ushort)_hpMaxNumeric.Value;
+        selected.StaminaCurrent = (ushort)_staminaCurNumeric.Value;
+        selected.StaminaMax = (ushort)_staminaMaxNumeric.Value;
+        selected.LoadCurrentTenths = (ushort)_loadCurNumeric.Value;
+        selected.LoadMaxTenths = (ushort)_loadMaxNumeric.Value;
+        selected.InventoryPage1Count = (byte)_inventoryPage1Numeric.Value;
+        selected.InventoryPage2Count = (byte)_inventoryPage2Numeric.Value;
+
+        if (_raceCombo.SelectedItem is ComboItem raceItem)
+        {
+            selected.RaceId = raceItem.Key;
+        }
+
+        if (_genderCombo.SelectedItem is ComboItem genderItem)
+        {
+            selected.GenderId = genderItem.Key;
+        }
+
+        if (_classCombo.SelectedItem is ComboItem classItem)
+        {
+            selected.ClassId = classItem.Key;
+        }
+
+        for (var i = 0; i < 8; i++)
+        {
+            if (_statsPanel.Controls[i] is Panel p && p.Controls.OfType<NumericUpDown>().FirstOrDefault() is NumericUpDown numeric)
+            {
+                selected.Stats[i] = (byte)numeric.Value;
+            }
+        }
+
+        _grid.Refresh();
+    }
+
+    private void LoadSelectionIntoEditor()
+    {
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        _isUpdatingUi = true;
+        _nameTextBox.Text = selected.Name;
+        SetNumericValue(_levelNumeric, selected.Level);
+        SetNumericValue(_rankNumeric, selected.Rank);
+        SetNumericValue(_ageNumeric, selected.AgeYears);
+        SetNumericValue(_hpCurNumeric, selected.HitPointsCurrent);
+        SetNumericValue(_hpMaxNumeric, selected.HitPointsMax);
+        SetNumericValue(_staminaCurNumeric, selected.StaminaCurrent);
+        SetNumericValue(_staminaMaxNumeric, selected.StaminaMax);
+        SetNumericValue(_loadCurNumeric, selected.LoadCurrentTenths);
+        SetNumericValue(_loadMaxNumeric, selected.LoadMaxTenths);
+        SetNumericValue(_inventoryPage1Numeric, selected.InventoryPage1Count);
+        SetNumericValue(_inventoryPage2Numeric, selected.InventoryPage2Count);
+
+        SelectComboByKey(_raceCombo, selected.RaceId);
+        SelectComboByKey(_genderCombo, selected.GenderId);
+        SelectComboByKey(_classCombo, selected.ClassId);
+
+        for (var i = 0; i < 8; i++)
+        {
+            if (_statsPanel.Controls[i] is Panel p && p.Controls.OfType<NumericUpDown>().FirstOrDefault() is NumericUpDown numeric)
+            {
+                numeric.Value = selected.Stats[i];
+            }
+        }
+
+        RefreshSpellPointsGrid(selected);
+        RefreshSkillsGrid(selected);
+        RefreshInventoryGrid(selected);
+        _knownSpellsHexTextBox.Text = BitConverter.ToString(selected.KnownSpellsBitset).Replace("-", string.Empty);
+
+        _isUpdatingUi = false;
+    }
+
+    private void RefreshSpellPointsGrid(CharacterRecord selected)
+    {
+        _spellPointsGrid.Rows.Clear();
+        for (var i = 0; i < 6; i++)
+        {
+            _spellPointsGrid.Rows.Add(SpellSchoolNames[i], selected.SpellPointsCurrent[i], selected.SpellPointsMax[i]);
+        }
+    }
+
+    private void RefreshSkillsGrid(CharacterRecord selected)
+    {
+        _skillsGrid.Rows.Clear();
+        for (var i = 0; i < selected.Skills.Length; i++)
+        {
+            _skillsGrid.Rows.Add(i, GetSkillLabel(i), selected.Skills[i]);
+        }
+    }
+
+    private void RefreshInventoryGrid(CharacterRecord selected)
+    {
+        _inventoryGrid.Rows.Clear();
+        for (var i = 0; i < selected.Inventory.Length; i++)
+        {
+            var entry = selected.Inventory[i];
+            _inventoryGrid.Rows.Add(i, entry.ItemId, entry.LoadTenths, entry.Byte4, entry.Byte5, entry.Byte6, entry.Byte7);
+        }
+    }
+
+    private void ApplySpellPointGrid()
+    {
+        if (_isUpdatingUi)
+        {
+            return;
+        }
+
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < 6 && i < _spellPointsGrid.Rows.Count; i++)
+        {
+            var row = _spellPointsGrid.Rows[i];
+            selected.SpellPointsCurrent[i] = ParseUShortCell(row.Cells[1].Value);
+            selected.SpellPointsMax[i] = ParseUShortCell(row.Cells[2].Value);
+        }
+    }
+
+    private void ApplySkillsGrid()
+    {
+        if (_isUpdatingUi)
+        {
+            return;
+        }
+
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < selected.Skills.Length && i < _skillsGrid.Rows.Count; i++)
+        {
+            selected.Skills[i] = ParseByteCell(_skillsGrid.Rows[i].Cells[2].Value);
+        }
+    }
+
+    private void ApplyInventoryGrid()
+    {
+        if (_isUpdatingUi)
+        {
+            return;
+        }
+
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < selected.Inventory.Length && i < _inventoryGrid.Rows.Count; i++)
+        {
+            var row = _inventoryGrid.Rows[i];
+            var entry = selected.Inventory[i];
+            entry.ItemId = ParseUShortCell(row.Cells[1].Value);
+            entry.LoadTenths = ParseUShortCell(row.Cells[2].Value);
+            entry.Byte4 = ParseByteCell(row.Cells[3].Value);
+            entry.Byte5 = ParseByteCell(row.Cells[4].Value);
+            entry.Byte6 = ParseByteCell(row.Cells[5].Value);
+            entry.Byte7 = ParseByteCell(row.Cells[6].Value);
+        }
+    }
+
+    private void ApplyKnownSpellsHex()
+    {
+        if (_isUpdatingUi)
+        {
+            return;
+        }
+
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        var text = _knownSpellsHexTextBox.Text.Trim().Replace(" ", string.Empty);
+        if (text.Length != 24)
+        {
+            return;
+        }
+
+        try
+        {
+            for (var i = 0; i < 12; i++)
+            {
+                selected.KnownSpellsBitset[i] = byte.Parse(text.Substring(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            }
+        }
+        catch (FormatException)
+        {
+        }
+    }
+
+    private CharacterRecord? GetSelectedRecord()
+    {
+        if (_grid.CurrentRow?.DataBoundItem is CharacterRecord record)
+        {
+            return record;
+        }
+
+        return null;
+    }
+
+    private void OpenFile()
+    {
+        using (var dialog = new OpenFileDialog())
+        {
+            dialog.Filter = "Wizardry PCFILE (*.dbs)|*.dbs|All files (*.*)|*.*";
+            dialog.Title = "Open PCFILE.DBS";
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                _document = PcfileDocument.Load(dialog.FileName);
+                _currentPath = dialog.FileName;
+
+                _records.Clear();
+                foreach (var record in _document.Records)
+                {
+                    _records.Add(record);
+                }
+
+                Text = $"Wizardry 6 Character Roster Editor - {Path.GetFileName(_currentPath)}";
+                if (_records.Count > 0)
+                {
+                    _grid.Rows[0].Selected = true;
+                    _grid.CurrentCell = _grid.Rows[0].Cells[0];
+                    LoadSelectionIntoEditor();
+                }
+            }
+        }
+    }
+
+    private void SaveFile(bool forceChoosePath)
+    {
+        if (_document == null)
+        {
+            MessageBox.Show(this, "Load a file first.", "No document", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var outputPath = _currentPath;
+        if (forceChoosePath || string.IsNullOrWhiteSpace(outputPath))
+        {
+            using (var dialog = new SaveFileDialog())
+            {
+                dialog.Filter = "Wizardry PCFILE (*.dbs)|*.dbs|All files (*.*)|*.*";
+                dialog.Title = "Save PCFILE.DBS";
+                dialog.FileName = Path.GetFileName(outputPath) ?? "PCFILE.DBS";
+
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                outputPath = dialog.FileName;
+            }
+        }
+
+        _document.Records.Clear();
+        foreach (var record in _records)
+        {
+            _document.Records.Add(record);
+        }
+
+        _document.Save(outputPath!);
+        _currentPath = outputPath;
+
+        MessageBox.Show(this, "Roster saved successfully.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private Button CreateButton(string text, EventHandler onClick)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Height = 34,
+            Width = 150,
+            FlatStyle = FlatStyle.Flat,
+            Margin = new Padding(0, 0, 12, 0),
+        };
+        button.FlatAppearance.BorderSize = 1;
+        button.Click += onClick;
+        return button;
+    }
+
+    private NumericUpDown ConfigureNumeric(NumericUpDown control, decimal min, decimal max)
+    {
+        control.Minimum = min;
+        control.Maximum = max;
+        control.Width = 180;
+        return control;
+    }
+
+    private void AddEditorRow(TableLayoutPanel layout, int row, string labelText, Control control)
+    {
+        if (layout.RowStyles.Count <= row)
+        {
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
+
+        var label = new Label { Text = labelText, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 6, 8, 6) };
+
+        control.Dock = DockStyle.Left;
+        control.Margin = new Padding(0, 4, 0, 4);
+
+        layout.Controls.Add(label, 0, row);
+        layout.Controls.Add(control, 1, row);
+    }
+
+    private void PopulateCombo(ComboBox combo, System.Collections.Generic.IReadOnlyDictionary<byte, string> values)
+    {
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.Width = 220;
+        combo.Items.Clear();
+
+        foreach (var kvp in values.OrderBy(k => k.Key))
+        {
+            combo.Items.Add(new ComboItem(kvp.Key, kvp.Value));
+        }
+
+        if (combo.Items.Count > 0)
+        {
+            combo.SelectedIndex = 0;
+        }
+    }
+
+    private static void SelectComboByKey(ComboBox combo, byte key)
+    {
+        for (var i = 0; i < combo.Items.Count; i++)
+        {
+            if (combo.Items[i] is ComboItem item && item.Key == key)
+            {
+                combo.SelectedIndex = i;
+                return;
+            }
+        }
+
+        combo.Items.Add(new ComboItem(key, $"Unknown ({key})"));
+        combo.SelectedIndex = combo.Items.Count - 1;
+    }
+
+    private static void SetNumericValue(NumericUpDown numeric, decimal value)
+    {
+        if (value < numeric.Minimum)
+        {
+            numeric.Value = numeric.Minimum;
+            return;
+        }
+
+        if (value > numeric.Maximum)
+        {
+            numeric.Value = numeric.Maximum;
+            return;
+        }
+
+        numeric.Value = value;
+    }
+
+    private static ushort ParseUShortCell(object? value)
+    {
+        return ushort.TryParse(value?.ToString(), out var parsed) ? parsed : (ushort)0;
+    }
+
+    private static byte ParseByteCell(object? value)
+    {
+        return byte.TryParse(value?.ToString(), out var parsed) ? parsed : (byte)0;
+    }
+
+    private static string GetSkillLabel(int index)
+    {
+        switch (index)
+        {
+            case 0: return "wand_and_dagger";
+            case 1: return "sword";
+            case 2: return "axe";
+            case 3: return "mace_and_flail";
+            case 4: return "pole_and_staff";
+            case 5: return "throwing";
+            case 6: return "sling";
+            case 7: return "bow";
+            case 8: return "shield";
+            case 9: return "hands_and_feet";
+            case 10: return "non-skill byte";
+            case 11: return "artifacts";
+            case 12: return "music";
+            case 13: return "oratory";
+            case 14: return "legerdemain";
+            case 15: return "skulduggery";
+            case 16: return "ninjutsu";
+            case 17: return "non-skill byte";
+            case 18: return "non-skill byte";
+            case 19: return "non-skill byte";
+            case 20: return "non-skill byte";
+            case 21: return "non-skill byte";
+            case 22: return "scouting";
+            case 23: return "mythology";
+            case 24: return "scribe";
+            case 25: return "alchemy";
+            case 26: return "theology";
+            case 27: return "theosophy";
+            case 28: return "thaumaturgy";
+            case 29: return "kirijutsu";
+            default: return "unknown";
+        }
+    }
+
+    private void GridOnCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (_grid.Rows[e.RowIndex].DataBoundItem is not CharacterRecord record)
+        {
+            return;
+        }
+
+        if (_grid.Columns[e.ColumnIndex].Name == "RaceDisplay")
+        {
+            e.Value = record.GetRaceDisplayName();
+            e.FormattingApplied = true;
+        }
+        else if (_grid.Columns[e.ColumnIndex].Name == "ClassDisplay")
+        {
+            e.Value = record.GetClassDisplayName();
+            e.FormattingApplied = true;
+        }
+    }
+
+    private static void ConfigureTableGrid(DataGridView grid)
+    {
+        grid.Dock = DockStyle.Fill;
+        grid.AllowUserToAddRows = false;
+        grid.AllowUserToDeleteRows = false;
+        grid.RowHeadersVisible = false;
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+    }
+
+    private void ApplyStyle()
+    {
+        BackColor = Color.FromArgb(18, 18, 22);
+        ForeColor = Color.FromArgb(236, 236, 243);
+        ApplyControlStyle(Controls);
+
+        StyleGrid(_grid);
+        StyleGrid(_spellPointsGrid);
+        StyleGrid(_skillsGrid);
+        StyleGrid(_inventoryGrid);
+    }
+
+    private void StyleGrid(DataGridView grid)
+    {
+        grid.BackgroundColor = Color.FromArgb(26, 29, 36);
+        grid.DefaultCellStyle.BackColor = Color.FromArgb(32, 35, 44);
+        grid.DefaultCellStyle.ForeColor = ForeColor;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(92, 76, 184);
+        grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(42, 46, 58);
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = ForeColor;
+        grid.EnableHeadersVisualStyles = false;
+        grid.GridColor = Color.FromArgb(56, 61, 74);
+    }
+
+    private void ApplyControlStyle(Control.ControlCollection controls)
+    {
+        foreach (Control control in controls)
+        {
+            switch (control)
+            {
+                case Button button:
+                    button.BackColor = Color.FromArgb(92, 76, 184);
+                    button.ForeColor = Color.White;
+                    button.FlatAppearance.BorderColor = Color.FromArgb(119, 102, 222);
+                    break;
+                case TextBox textBox:
+                    textBox.BackColor = Color.FromArgb(30, 33, 42);
+                    textBox.ForeColor = ForeColor;
+                    textBox.BorderStyle = BorderStyle.FixedSingle;
+                    break;
+                case NumericUpDown numeric:
+                    numeric.BackColor = Color.FromArgb(30, 33, 42);
+                    numeric.ForeColor = ForeColor;
+                    break;
+                case ComboBox combo:
+                    combo.BackColor = Color.FromArgb(30, 33, 42);
+                    combo.ForeColor = ForeColor;
+                    break;
+                case TabControl tabs:
+                    tabs.BackColor = Color.FromArgb(21, 24, 31);
+                    tabs.ForeColor = ForeColor;
+                    break;
+                case TabPage page:
+                    page.BackColor = Color.FromArgb(21, 24, 31);
+                    page.ForeColor = ForeColor;
+                    break;
+                case Panel panel:
+                    panel.BackColor = Color.FromArgb(21, 24, 31);
+                    break;
+            }
+
+            ApplyControlStyle(control.Controls);
+        }
+    }
+
+    private sealed class ComboItem
+    {
+        public ComboItem(byte key, string value)
+        {
+            Key = key;
+            Value = value;
+        }
+
+        public byte Key { get; }
+
+        public string Value { get; }
+
+        public override string ToString() => Value;
+    }
+}
