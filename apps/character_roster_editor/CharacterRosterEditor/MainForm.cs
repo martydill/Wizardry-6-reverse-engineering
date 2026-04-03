@@ -722,8 +722,9 @@ internal sealed class MainForm : Form
 
     private void ApplyStyle()
     {
-        BackColor = Color.FromArgb(18, 18, 22);
-        ForeColor = Color.FromArgb(236, 236, 243);
+        Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+        BackColor = Color.FromArgb(245, 247, 250);
+        ForeColor = Color.FromArgb(33, 37, 41);
         ApplyControlStyle(Controls);
 
         StyleGrid(_grid);
@@ -734,15 +735,19 @@ internal sealed class MainForm : Form
 
     private void StyleGrid(DataGridView grid)
     {
-        grid.BackgroundColor = Color.FromArgb(26, 29, 36);
-        grid.DefaultCellStyle.BackColor = Color.FromArgb(32, 35, 44);
+        grid.BackgroundColor = Color.White;
+        grid.BorderStyle = BorderStyle.None;
+        grid.DefaultCellStyle.BackColor = Color.White;
         grid.DefaultCellStyle.ForeColor = ForeColor;
-        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(92, 76, 184);
-        grid.DefaultCellStyle.SelectionForeColor = Color.White;
-        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(42, 46, 58);
-        grid.ColumnHeadersDefaultCellStyle.ForeColor = ForeColor;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, 236, 255);
+        grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(20, 52, 100);
+        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(235, 240, 246);
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(47, 62, 79);
+        grid.ColumnHeadersDefaultCellStyle.Font = new Font(Font, FontStyle.Bold);
+        grid.ColumnHeadersHeight = 34;
         grid.EnableHeadersVisualStyles = false;
-        grid.GridColor = Color.FromArgb(56, 61, 74);
+        grid.GridColor = Color.FromArgb(220, 227, 234);
     }
 
     private void ApplyControlStyle(Control.ControlCollection controls)
@@ -752,33 +757,40 @@ internal sealed class MainForm : Form
             switch (control)
             {
                 case Button button:
-                    button.BackColor = Color.FromArgb(92, 76, 184);
+                    button.BackColor = Color.FromArgb(42, 120, 228);
                     button.ForeColor = Color.White;
-                    button.FlatAppearance.BorderColor = Color.FromArgb(119, 102, 222);
+                    button.FlatAppearance.BorderColor = Color.FromArgb(29, 95, 184);
                     break;
                 case TextBox textBox:
-                    textBox.BackColor = Color.FromArgb(30, 33, 42);
-                    textBox.ForeColor = ForeColor;
+                    textBox.BackColor = Color.White;
+                    textBox.ForeColor = Color.FromArgb(33, 37, 41);
                     textBox.BorderStyle = BorderStyle.FixedSingle;
                     break;
                 case NumericUpDown numeric:
-                    numeric.BackColor = Color.FromArgb(30, 33, 42);
-                    numeric.ForeColor = ForeColor;
+                    numeric.BackColor = Color.White;
+                    numeric.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
                 case ComboBox combo:
-                    combo.BackColor = Color.FromArgb(30, 33, 42);
-                    combo.ForeColor = ForeColor;
+                    combo.BackColor = Color.White;
+                    combo.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
                 case TabControl tabs:
-                    tabs.BackColor = Color.FromArgb(21, 24, 31);
-                    tabs.ForeColor = ForeColor;
+                    tabs.BackColor = Color.FromArgb(245, 247, 250);
+                    tabs.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
                 case TabPage page:
-                    page.BackColor = Color.FromArgb(21, 24, 31);
-                    page.ForeColor = ForeColor;
+                    page.BackColor = Color.FromArgb(245, 247, 250);
+                    page.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
                 case Panel panel:
-                    panel.BackColor = Color.FromArgb(21, 24, 31);
+                    panel.BackColor = Color.FromArgb(245, 247, 250);
+                    break;
+                case Label label:
+                    label.ForeColor = Color.FromArgb(52, 58, 64);
+                    break;
+                case FlowLayoutPanel flowPanel:
+                    flowPanel.BackColor = Color.FromArgb(245, 247, 250);
+                    flowPanel.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
             }
 

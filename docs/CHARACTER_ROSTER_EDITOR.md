@@ -4,7 +4,7 @@ A modern WinForms editor for `PCFILE.DBS` character rosters.
 
 - Solution path: `apps/character_roster_editor/CharacterRosterEditor.sln`
 - Target framework: `.NET Framework 4.8`
-- UI: dark modern style, roster grid + detail editor pane
+- UI: modern light theme, roster grid + detail editor pane
 
 ## Features
 
