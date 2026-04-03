@@ -111,6 +111,7 @@ internal sealed class MainForm : Form
         _grid.AllowUserToDeleteRows = false;
         _grid.DataSource = _records;
         _grid.RowHeadersVisible = false;
+        _grid.SelectionChanged += (_, __) => LoadSelectionIntoEditor();
         _grid.CellClick += (_, __) => LoadSelectionIntoEditor();
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.SlotIndex), HeaderText = "Slot", Width = 50 });
