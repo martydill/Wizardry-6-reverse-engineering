@@ -584,8 +584,9 @@ internal sealed class MainForm : Form
             return;
         }
 
-        LoadPortraitFile(directory, "WPORT0.EGA");
-        LoadPortraitFile(directory, "WPORT1.EGA");
+        var resolvedDirectory = directory!;
+        LoadPortraitFile(resolvedDirectory, "WPORT0.EGA");
+        LoadPortraitFile(resolvedDirectory, "WPORT1.EGA");
     }
 
     private void LoadPortraitFile(string directory, string fileName)
@@ -971,15 +972,15 @@ internal sealed class MainForm : Form
                     page.BackColor = Color.FromArgb(245, 247, 250);
                     page.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
+                case FlowLayoutPanel flowPanel:
+                    flowPanel.BackColor = Color.FromArgb(245, 247, 250);
+                    flowPanel.ForeColor = Color.FromArgb(33, 37, 41);
+                    break;
                 case Panel panel:
                     panel.BackColor = Color.FromArgb(245, 247, 250);
                     break;
                 case Label label:
                     label.ForeColor = Color.FromArgb(52, 58, 64);
-                    break;
-                case FlowLayoutPanel flowPanel:
-                    flowPanel.BackColor = Color.FromArgb(245, 247, 250);
-                    flowPanel.ForeColor = Color.FromArgb(33, 37, 41);
                     break;
             }
 
