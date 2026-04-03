@@ -441,7 +441,7 @@ internal sealed class MainForm : Form
         }
 
         _portraitPictureBox.Image = ScaleNearest(frames[portrait.Value.FrameIndex], 4);
-        _portraitInfoLabel.Text = $"{portrait.Value.FileName} frame {portrait.Value.FrameIndex} (raw: 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}, 0x1AB={portraitIndexRaw})";
+        _portraitInfoLabel.Text = $"{portrait.Value.FileName} frame {portrait.Value.FrameIndex} via {portrait.Value.Source} (raw: 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}, 0x1AB={portraitIndexRaw})";
     }
 
     private void RefreshSpellPointsGrid(CharacterRecord selected)
@@ -709,21 +709,29 @@ internal sealed class MainForm : Form
         return output;
     }
 
-    private static (string FileName, int FrameIndex)? ResolvePortraitReference(byte raw1A9, byte raw1AA, byte raw1AB)
+    private static (string FileName, int FrameIndex, string Source)? ResolvePortraitReference(byte raw1A9, byte raw1AA, byte raw1AB)
     {
-        if (raw1AB < 28)
+        if (raw1A9 <= 1)
         {
-            return (raw1AB < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AB % 14);
+            if (raw1AA < 14)
+            {
+                return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA, "0x1A9+0x1AA (0-based)");
+            }
+
+            if (raw1AA is >= 1 and <= 14)
+            {
+                return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA - 1, "0x1A9+0x1AA (1-based)");
+            }
         }
 
-        if (raw1A9 <= 1 && raw1AA < 14)
+        if (raw1AB < 28)
         {
-            return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA);
+            return (raw1AB < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AB % 14, "0x1AB absolute");
         }
 
         if (raw1A9 < 28)
         {
-            return (raw1A9 < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1A9 % 14);
+            return (raw1A9 < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1A9 % 14, "0x1A9 absolute");
         }
 
         return null;
