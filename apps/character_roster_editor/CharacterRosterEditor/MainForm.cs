@@ -197,7 +197,9 @@ internal sealed class MainForm : Form
     {
         _statsPanel.Dock = DockStyle.Fill;
         _statsPanel.AutoSize = true;
-        _statsPanel.WrapContents = true;
+        _statsPanel.WrapContents = false;
+        _statsPanel.AutoScroll = true;
+        _statsPanel.Height = 72;
         _statsPanel.FlowDirection = FlowDirection.LeftToRight;
 
         var statNames = new[] { "STR", "INT", "PIE", "VIT", "DEX", "SPD", "PER", "KAR" };
