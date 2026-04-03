@@ -77,6 +77,7 @@ internal sealed class MainForm : Form
         buttonPanel.Controls.Add(CreateButton("Open PCFILE.DBS", (_, __) => OpenFile()));
         buttonPanel.Controls.Add(CreateButton("Save", (_, __) => SaveFile(false)));
         buttonPanel.Controls.Add(CreateButton("Save As", (_, __) => SaveFile(true)));
+        buttonPanel.Controls.Add(CreateButton("Delete Character", (_, __) => DeleteSelectedCharacter()));
 
         root.Controls.Add(buttonPanel, 0, 0);
         root.SetColumnSpan(buttonPanel, 2);
@@ -554,6 +555,38 @@ internal sealed class MainForm : Form
         _currentPath = outputPath;
 
         MessageBox.Show(this, "Roster saved successfully.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void DeleteSelectedCharacter()
+    {
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            MessageBox.Show(this, "Select a character slot first.", "No selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!selected.IsActive)
+        {
+            MessageBox.Show(this, "This slot is already empty.", "Nothing to delete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var confirmation = MessageBox.Show(
+            this,
+            $"Delete character in slot {selected.SlotIndex} ({selected.Name})?",
+            "Confirm deletion",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+
+        if (confirmation != DialogResult.Yes)
+        {
+            return;
+        }
+
+        selected.Clear();
+        LoadSelectionIntoEditor();
+        _grid.Refresh();
     }
 
     private Button CreateButton(string text, EventHandler onClick)

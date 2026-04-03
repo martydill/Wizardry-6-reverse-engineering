@@ -9,6 +9,7 @@ A modern WinForms editor for `PCFILE.DBS` character rosters.
 ## Features
 
 - Open and save Wizardry 6 `PCFILE.DBS` files.
+- Delete a selected character slot (clears the record to an empty slot).
 - Displays all character slots from the file header table.
 - Editable fields (all currently known fields from the documented format):
   - Name

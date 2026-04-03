@@ -63,6 +63,43 @@ internal sealed class CharacterRecord
 
     public int AgeYears => (int)(AgeDays / 365u);
 
+    public void Clear()
+    {
+        Name = string.Empty;
+        AgeDays = 0;
+        HitPointsCurrent = 0;
+        HitPointsMax = 0;
+        StaminaCurrent = 0;
+        StaminaMax = 0;
+        LoadCurrentTenths = 0;
+        LoadMaxTenths = 0;
+        Rank = 0;
+        Level = 0;
+        RaceId = 0;
+        GenderId = 0;
+        ClassId = 0;
+        InventoryPage1Count = 0;
+        InventoryPage2Count = 0;
+
+        Array.Clear(SpellPointsCurrent, 0, SpellPointsCurrent.Length);
+        Array.Clear(SpellPointsMax, 0, SpellPointsMax.Length);
+        Array.Clear(Stats, 0, Stats.Length);
+        Array.Clear(Skills, 0, Skills.Length);
+        Array.Clear(KnownSpellsBitset, 0, KnownSpellsBitset.Length);
+
+        foreach (var entry in Inventory)
+        {
+            entry.ItemId = 0;
+            entry.LoadTenths = 0;
+            entry.Byte4 = 0;
+            entry.Byte5 = 0;
+            entry.Byte6 = 0;
+            entry.Byte7 = 0;
+        }
+
+        RawRecordBytes = new byte[RecordSize];
+    }
+
     public static CharacterRecord FromBytes(int slotIndex, byte[] data)
     {
         if (data.Length < RecordSize)
