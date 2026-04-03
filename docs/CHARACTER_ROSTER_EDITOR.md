@@ -47,7 +47,7 @@ Implemented offsets follow `file_format_docs/PCFILE_DBS.md`:
 - Skills block loaded/preserved from `0x134..0x151`
 - Known spell bitset loaded/preserved from `0x188..0x193`
 - Race/Gender/Class at `0x19D..0x19F`
-- Portrait selector bytes are read from late-record raw bytes (`0x1A9` + `0x1AA` primary, with `0x1AB` absolute fallback) for preview resolution against WPORT frames.
+- Portrait selector bytes are read from late-record raw bytes (`0x1A9` + `0x1AA`) for preview resolution against WPORT frames.
 
 ## Build (Windows)
 

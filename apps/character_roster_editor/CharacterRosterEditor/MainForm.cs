@@ -423,7 +423,7 @@ internal sealed class MainForm : Form
         var portraitFileRaw = selected.RawRecordBytes.Length > 0x1A9 ? selected.RawRecordBytes[0x1A9] : (byte)0;
         var portraitFrameRaw = selected.RawRecordBytes.Length > 0x1AA ? selected.RawRecordBytes[0x1AA] : (byte)0;
         var portraitIndexRaw = selected.RawRecordBytes.Length > 0x1AB ? selected.RawRecordBytes[0x1AB] : (byte)0;
-        var portrait = ResolvePortraitReference(portraitFileRaw, portraitFrameRaw, portraitIndexRaw);
+        var portrait = ResolvePortraitReference(portraitFileRaw, portraitFrameRaw);
         if (portrait == null)
         {
             _portraitPictureBox.Image = null;
@@ -709,7 +709,7 @@ internal sealed class MainForm : Form
         return output;
     }
 
-    private static (string FileName, int FrameIndex, string Source)? ResolvePortraitReference(byte raw1A9, byte raw1AA, byte raw1AB)
+    private static (string FileName, int FrameIndex, string Source)? ResolvePortraitReference(byte raw1A9, byte raw1AA)
     {
         if (raw1A9 <= 1)
         {
@@ -722,11 +722,6 @@ internal sealed class MainForm : Form
             {
                 return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA - 1, "0x1A9+0x1AA (1-based)");
             }
-        }
-
-        if (raw1AB < 28)
-        {
-            return (raw1AB < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AB % 14, "0x1AB absolute");
         }
 
         if (raw1A9 < 28)
