@@ -420,11 +420,12 @@ internal sealed class MainForm : Form
     {
         var portraitFileRaw = selected.RawRecordBytes.Length > 0x1A9 ? selected.RawRecordBytes[0x1A9] : (byte)0;
         var portraitFrameRaw = selected.RawRecordBytes.Length > 0x1AA ? selected.RawRecordBytes[0x1AA] : (byte)0;
-        var portrait = ResolvePortraitReference(portraitFileRaw, portraitFrameRaw);
+        var portraitIndexRaw = selected.RawRecordBytes.Length > 0x1AB ? selected.RawRecordBytes[0x1AB] : (byte)0;
+        var portrait = ResolvePortraitReference(portraitFileRaw, portraitFrameRaw, portraitIndexRaw);
         if (portrait == null)
         {
             _portraitPictureBox.Image = null;
-            _portraitInfoLabel.Text = $"Portrait not available (raw 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}).";
+            _portraitInfoLabel.Text = $"Portrait not available (raw 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}, 0x1AB={portraitIndexRaw}).";
             return;
         }
 
@@ -438,7 +439,7 @@ internal sealed class MainForm : Form
         }
 
         _portraitPictureBox.Image = ScaleNearest(frames[portrait.Value.FrameIndex], 4);
-        _portraitInfoLabel.Text = $"{portrait.Value.FileName} frame {portrait.Value.FrameIndex} (raw: 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw})";
+        _portraitInfoLabel.Text = $"{portrait.Value.FileName} frame {portrait.Value.FrameIndex} (raw: 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}, 0x1AB={portraitIndexRaw})";
     }
 
     private void RefreshSpellPointsGrid(CharacterRecord selected)
@@ -706,8 +707,13 @@ internal sealed class MainForm : Form
         return output;
     }
 
-    private static (string FileName, int FrameIndex)? ResolvePortraitReference(byte raw1A9, byte raw1AA)
+    private static (string FileName, int FrameIndex)? ResolvePortraitReference(byte raw1A9, byte raw1AA, byte raw1AB)
     {
+        if (raw1AB < 28)
+        {
+            return (raw1AB < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AB % 14);
+        }
+
         if (raw1A9 <= 1 && raw1AA < 14)
         {
             return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA);
