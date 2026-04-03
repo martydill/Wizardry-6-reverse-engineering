@@ -133,36 +133,64 @@ internal sealed class MainForm : Form
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        AddEditorRow(layout, 0, "Name", _nameTextBox);
-        AddEditorRow(layout, 1, "Age (Years)", ConfigureNumeric(_ageNumeric, 0, uint.MaxValue / 365u));
-        AddEditorRow(layout, 2, "Level", ConfigureNumeric(_levelNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 3, "Rank", ConfigureNumeric(_rankNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 4, "HP Current", ConfigureNumeric(_hpCurNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 5, "HP Max", ConfigureNumeric(_hpMaxNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 6, "Stamina Cur", ConfigureNumeric(_staminaCurNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 7, "Stamina Max", ConfigureNumeric(_staminaMaxNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 8, "Load Cur (x10)", ConfigureNumeric(_loadCurNumeric, 0, 65535));
-        AddEditorRow(layout, 9, "Load Max (x10)", ConfigureNumeric(_loadMaxNumeric, 0, 65535));
+        ConfigureNumeric(_ageNumeric, 0, uint.MaxValue / 365u);
+        ConfigureNumeric(_levelNumeric, 0, ushort.MaxValue);
+        ConfigureNumeric(_rankNumeric, 0, ushort.MaxValue);
+
+        BuildStatsEditor();
+
+        var identityAndStats = BuildIdentityAndStatsSection();
+        layout.Controls.Add(identityAndStats, 0, 0);
+        layout.SetColumnSpan(identityAndStats, 2);
+
+        AddEditorRow(layout, 1, "HP Current", ConfigureNumeric(_hpCurNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 2, "HP Max", ConfigureNumeric(_hpMaxNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 3, "Stamina Cur", ConfigureNumeric(_staminaCurNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 4, "Stamina Max", ConfigureNumeric(_staminaMaxNumeric, 0, ushort.MaxValue));
+        AddEditorRow(layout, 5, "Load Cur (x10)", ConfigureNumeric(_loadCurNumeric, 0, 65535));
+        AddEditorRow(layout, 6, "Load Max (x10)", ConfigureNumeric(_loadMaxNumeric, 0, 65535));
 
         PopulateCombo(_raceCombo, LookupTables.Races);
         PopulateCombo(_genderCombo, LookupTables.Genders);
         PopulateCombo(_classCombo, LookupTables.Classes);
 
-        AddEditorRow(layout, 10, "Race", _raceCombo);
-        AddEditorRow(layout, 11, "Gender", _genderCombo);
-        AddEditorRow(layout, 12, "Class", _classCombo);
-        AddEditorRow(layout, 13, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
-        AddEditorRow(layout, 14, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
+        AddEditorRow(layout, 7, "Race", _raceCombo);
+        AddEditorRow(layout, 8, "Gender", _genderCombo);
+        AddEditorRow(layout, 9, "Class", _classCombo);
+        AddEditorRow(layout, 10, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
+        AddEditorRow(layout, 11, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
+        AddEditorRow(layout, 12, "Portrait", BuildPortraitPreviewPanel());
 
-        BuildStatsEditor();
-        AddEditorRow(layout, 15, "Stats", _statsPanel);
-        AddEditorRow(layout, 16, "Portrait", BuildPortraitPreviewPanel());
-
-        AddEditorRow(layout, 17, string.Empty, CreateButton("Apply Changes", (_, __) => ApplyEditorValues()));
+        AddEditorRow(layout, 13, string.Empty, CreateButton("Apply Changes", (_, __) => ApplyEditorValues()));
 
         WireEditorEvents();
         panel.Controls.Add(layout);
         return panel;
+    }
+
+    private Control BuildIdentityAndStatsSection()
+    {
+        var section = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 2,
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+
+        var identity = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+        identity.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        AddEditorRow(identity, 0, "Name", _nameTextBox);
+        AddEditorRow(identity, 1, "Age (Years)", _ageNumeric);
+        AddEditorRow(identity, 2, "Level", _levelNumeric);
+        AddEditorRow(identity, 3, "Rank", _rankNumeric);
+
+        section.Controls.Add(identity, 0, 0);
+        section.Controls.Add(_statsPanel, 1, 0);
+        return section;
     }
 
     private void BuildStatsEditor()
