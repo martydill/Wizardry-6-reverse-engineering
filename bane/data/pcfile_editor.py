@@ -27,6 +27,7 @@ Stable record fields used here:
 - `+0x26..+0x27`: level
 - `+0x28..+0x3F`: six school current/max spell-point pairs
 - `+0x188..+0x193`: 12-byte known-spell packed bitset
+- `+0x19C`: portrait index
 - `+0x12C..+0x133`: contiguous 8-byte stat block
 
 The first six stat bytes line up with the expected Wizardry creation stats:
@@ -56,6 +57,7 @@ GOLD_OFFSET = 0x20
 XP_OFFSET = 0x22
 SPELL_KNOWN_BLOCK_OFFSET = 0x188
 SPELL_KNOWN_BLOCK_SIZE = 12
+PORTRAIT_OFFSET = 0x19C
 STAT_BLOCK_OFFSET = 0x12C
 STAT_BLOCK_SIZE = 8
 SKILL_BLOCK_OFFSET = 0x134

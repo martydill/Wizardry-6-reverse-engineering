@@ -204,6 +204,31 @@ This means the next reverse-engineering target for exact spell ownership is no
 longer the `+0x28` block in `WPCVW`; it is the shared helper pair and the
 spell metadata table they consume.
 
+### `+0x19C` = portrait index
+
+This byte is not read directly in `WPCVW`, but `WBASE` uses it while drawing
+party portraits.
+
+Evidence:
+
+- `WBASE:0x5C1C..0x5C39` walks the active character list
+- for each entry it loads `byte ptr [slot_base + 0x19C]`
+- it passes that byte to `WBASE:0x4F8E`
+- `WBASE:0x4F8E` opens `WPORT1.*` and selects one portrait frame by dividing
+  the input by `0x0E` (14 portraits per file) and using the remainder as the
+  in-file portrait slot
+
+So:
+
+- `+0x19C` is the persisted portrait index
+- it is a global portrait number across the portrait-file set, not just an
+  in-file `0..13` slot
+
+This matches observed data points such as:
+
+- `THESUS` -> `0`
+- `NOBAL` -> `3`
+
 ### `+0x40..+0xDF` = inventory entries
 
 `WPCVW` treats `+0x40` as the start of an 8-byte-per-entry table:

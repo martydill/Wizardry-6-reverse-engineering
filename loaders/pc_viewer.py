@@ -26,6 +26,7 @@ from bane.data.pcfile_editor import (
     XP_OFFSET,
     SPELL_KNOWN_BLOCK_OFFSET,
     SPELL_KNOWN_BLOCK_SIZE,
+    PORTRAIT_OFFSET,
     STAT_BLOCK_OFFSET,
     STAT_BLOCK_SIZE,
     RACE_NAMES_INTERNAL,
@@ -58,6 +59,7 @@ _EXTRA_FIELDS: list[tuple[int, str]] = [
     (0x16, "unk_0x16"),
     (0x24, "rank"),
     (0x26, "level"),
+    (0x19C, "portrait_index"),
     (0x1A5, "viewer_cached_0x1A5"),
     (0x1A9, "viewer_input_0x1A9"),
     (0x1AA, "viewer_input_0x1AA"),
@@ -111,7 +113,7 @@ def dump_record(record, *, show_hex: bool, item_defs: dict[int, object] | None) 
     print(
         f"  {record.name!r}  {record.class_name}#{record.class_id}  "
         f"{record.race_name}#{record.race_id}  {gender_str}({gender_ch})  "
-        f"Age={age_years}y + {age_days_remainder}d"
+        f"Portrait={d[PORTRAIT_OFFSET]}  Age={age_years}y + {age_days_remainder}d"
     )
     print(
         f"  HP={record.hp}/{_u16(d, HP_OFFSET + 2)}  "
@@ -170,7 +172,7 @@ def dump_record(record, *, show_hex: bool, item_defs: dict[int, object] | None) 
     for offset, label in _EXTRA_FIELDS:
         if offset >= len(d):
             continue
-        if offset in {0x1A5, 0x1A9, 0x1AA, 0x1AC, 0x1AD}:
+        if offset in {0x19C, 0x1A5, 0x1A9, 0x1AA, 0x1AC, 0x1AD}:
             val8 = d[offset]
             if val8:
                 extra_parts.append(f"+0x{offset:03X} {label}={val8} (0x{val8:02X})")
