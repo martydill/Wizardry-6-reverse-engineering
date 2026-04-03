@@ -11,7 +11,7 @@ A modern WinForms editor for `PCFILE.DBS` character rosters.
 - Open and save Wizardry 6 `PCFILE.DBS` files.
 - Delete a selected character slot (clears the record to an empty slot).
 - Displays all character slots from the file header table.
-- Displays portrait preview from `WPORT0.EGA` / `WPORT1.EGA` (when found beside `PCFILE.DBS`), using raw portrait selector bytes from the character late-record area.
+- Displays portrait preview from `WPORT0.EGA` / `WPORT1.EGA`, searching common locations (same folder as `PCFILE.DBS`, local `gamedata/`, parent folder, and parent `gamedata/`), using raw portrait selector bytes from the character late-record area.
 - Uses a compact Core layout with primary identity fields (name/age/level/rank) and stats shown side-by-side.
 - Editable fields (all currently known fields from the documented format):
   - Name

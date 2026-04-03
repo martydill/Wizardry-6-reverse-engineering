@@ -639,8 +639,8 @@ internal sealed class MainForm : Form
 
     private void LoadPortraitFile(string directory, string fileName)
     {
-        var path = Path.Combine(directory, fileName);
-        if (!File.Exists(path))
+        var path = FindPortraitFile(directory, fileName);
+        if (path == null)
         {
             return;
         }
@@ -658,6 +658,46 @@ internal sealed class MainForm : Form
         }
 
         _portraitFramesByFile[fileName] = frames;
+    }
+
+    private static string? FindPortraitFile(string baseDirectory, string fileName)
+    {
+        foreach (var candidateDir in CandidatePortraitDirectories(baseDirectory))
+        {
+            if (!Directory.Exists(candidateDir))
+            {
+                continue;
+            }
+
+            var exactPath = Path.Combine(candidateDir, fileName);
+            if (File.Exists(exactPath))
+            {
+                return exactPath;
+            }
+
+            var match = Directory
+                .EnumerateFiles(candidateDir, "*", SearchOption.TopDirectoryOnly)
+                .FirstOrDefault(path => string.Equals(Path.GetFileName(path), fileName, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private static System.Collections.Generic.IEnumerable<string> CandidatePortraitDirectories(string baseDirectory)
+    {
+        yield return baseDirectory;
+        yield return Path.Combine(baseDirectory, "gamedata");
+
+        var parent = Directory.GetParent(baseDirectory)?.FullName;
+        if (!string.IsNullOrWhiteSpace(parent))
+        {
+            yield return parent;
+            yield return Path.Combine(parent, "gamedata");
+        }
     }
 
     private static Bitmap DecodePortraitFrame(byte[] bytes, int offset)
