@@ -13,6 +13,7 @@ namespace CharacterRosterEditor;
 internal sealed class MainForm : Form
 {
     private static readonly string[] SpellSchoolNames = { "Fire", "Water", "Air", "Earth", "Mental", "Magic" };
+    private static readonly int[] VisibleSkillIndices = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 22, 23, 24, 25, 26, 27, 28, 29 };
 
     private readonly BindingList<CharacterRecord> _records = new BindingList<CharacterRecord>();
 
@@ -424,9 +425,9 @@ internal sealed class MainForm : Form
     private void RefreshSkillsGrid(CharacterRecord selected)
     {
         _skillsGrid.Rows.Clear();
-        for (var i = 0; i < selected.Skills.Length; i++)
+        foreach (var skillIndex in VisibleSkillIndices)
         {
-            _skillsGrid.Rows.Add(i, GetSkillLabel(i), selected.Skills[i]);
+            _skillsGrid.Rows.Add(skillIndex, GetSkillLabel(skillIndex), selected.Skills[skillIndex]);
         }
     }
 
@@ -474,9 +475,24 @@ internal sealed class MainForm : Form
             return;
         }
 
-        for (var i = 0; i < selected.Skills.Length && i < _skillsGrid.Rows.Count; i++)
+        for (var rowIndex = 0; rowIndex < _skillsGrid.Rows.Count; rowIndex++)
         {
-            selected.Skills[i] = ParseByteCell(_skillsGrid.Rows[i].Cells[2].Value);
+            if (_skillsGrid.Rows[rowIndex].Cells[0].Value is null)
+            {
+                continue;
+            }
+
+            if (!int.TryParse(_skillsGrid.Rows[rowIndex].Cells[0].Value.ToString(), out var skillIndex))
+            {
+                continue;
+            }
+
+            if (skillIndex < 0 || skillIndex >= selected.Skills.Length)
+            {
+                continue;
+            }
+
+            selected.Skills[skillIndex] = ParseByteCell(_skillsGrid.Rows[rowIndex].Cells[2].Value);
         }
     }
 
@@ -859,18 +875,12 @@ internal sealed class MainForm : Form
             case 7: return "bow";
             case 8: return "shield";
             case 9: return "hands_and_feet";
-            case 10: return "non-skill byte";
             case 11: return "artifacts";
             case 12: return "music";
             case 13: return "oratory";
             case 14: return "legerdemain";
             case 15: return "skulduggery";
             case 16: return "ninjutsu";
-            case 17: return "non-skill byte";
-            case 18: return "non-skill byte";
-            case 19: return "non-skill byte";
-            case 20: return "non-skill byte";
-            case 21: return "non-skill byte";
             case 22: return "scouting";
             case 23: return "mythology";
             case 24: return "scribe";

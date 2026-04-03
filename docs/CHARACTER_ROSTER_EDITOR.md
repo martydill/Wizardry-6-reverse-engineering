@@ -21,7 +21,7 @@ A modern WinForms editor for `PCFILE.DBS` character rosters.
   - Spell points (current/max) for Fire, Water, Air, Earth, Mental, Magic
   - Race / Gender / Class
   - Primary stats (STR, INT, PIE, VIT, DEX, SPD, PER, KAR)
-  - Full 30-byte skills block (including unresolved non-skill bytes)
+  - Confirmed skill entries from the 30-byte skills block (unresolved non-skill bytes are preserved but hidden)
   - 20 inventory entries (`item id`, `load`, and bytes `+0x04..+0x07`)
   - Inventory page counts (`0x1AC`, `0x1AD`)
   - Full 12-byte known-spells bitset (hex editor)
