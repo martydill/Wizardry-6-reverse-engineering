@@ -450,7 +450,7 @@ internal sealed class MainForm : Form
             return;
         }
 
-        _undoStacks[_currentFrameIndex].Push(frame.Pixels.ToArray());
+        _undoStacks[_currentFrameIndex].Push(ClonePixels(frame.Pixels));
         _redoStacks[_currentFrameIndex].Clear();
     }
 
@@ -462,7 +462,7 @@ internal sealed class MainForm : Form
             return;
         }
 
-        _redoStacks[_currentFrameIndex].Push(frame.Pixels.ToArray());
+        _redoStacks[_currentFrameIndex].Push(ClonePixels(frame.Pixels));
         frame.Pixels = _undoStacks[_currentFrameIndex].Pop();
         Redraw();
     }
@@ -475,9 +475,16 @@ internal sealed class MainForm : Form
             return;
         }
 
-        _undoStacks[_currentFrameIndex].Push(frame.Pixels.ToArray());
+        _undoStacks[_currentFrameIndex].Push(ClonePixels(frame.Pixels));
         frame.Pixels = _redoStacks[_currentFrameIndex].Pop();
         Redraw();
+    }
+
+    private static byte[] ClonePixels(byte[] pixels)
+    {
+        var copy = new byte[pixels.Length];
+        Buffer.BlockCopy(pixels, 0, copy, 0, pixels.Length);
+        return copy;
     }
 
     private void StepFrame(int delta)
