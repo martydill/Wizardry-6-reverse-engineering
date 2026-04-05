@@ -10,7 +10,9 @@ namespace PicEditor;
 internal sealed class MainForm : Form
 {
     private readonly ListBox _frameList = new ListBox();
+    private readonly FlowLayoutPanel _frameStrip = new FlowLayoutPanel();
     private readonly PictureBox _canvas = new PictureBox();
+    private readonly PictureBox _nativePreview = new PictureBox();
     private readonly FlowLayoutPanel _palettePanel = new FlowLayoutPanel();
     private readonly NumericUpDown _zoomNumeric = new NumericUpDown();
     private readonly Label _statusLabel = new Label();
@@ -79,6 +81,7 @@ internal sealed class MainForm : Form
             if (_frameList.SelectedIndex >= 0)
             {
                 _currentFrameIndex = _frameList.SelectedIndex;
+                ReloadFrameStrip();
                 Redraw();
             }
         };
@@ -97,8 +100,9 @@ internal sealed class MainForm : Form
         undoPanel.Controls.Add(CreateButton("Redo", (_, __) => Redo()));
         left.Controls.Add(undoPanel, 0, 8);
 
-        var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, Padding = new Padding(8) };
+        var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 4, Padding = new Padding(8) };
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 106));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(right, 1, 0);
@@ -108,17 +112,45 @@ internal sealed class MainForm : Form
         _statusLabel.Height = 24;
         right.Controls.Add(_statusLabel, 0, 0);
 
+        _frameStrip.Dock = DockStyle.Fill;
+        _frameStrip.AutoScroll = true;
+        _frameStrip.WrapContents = false;
+        _frameStrip.FlowDirection = FlowDirection.LeftToRight;
+        _frameStrip.Padding = new Padding(4);
+        right.Controls.Add(_frameStrip, 0, 1);
+
+        var editorAndPreview = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterDistance = 880,
+        };
+        right.Controls.Add(editorAndPreview, 0, 2);
+
         _canvas.Dock = DockStyle.Fill;
         _canvas.SizeMode = PictureBoxSizeMode.Normal;
         _canvas.MouseDown += CanvasOnMouseDown;
         _canvas.MouseMove += CanvasOnMouseMove;
         _canvas.MouseUp += (_, __) => _dragging = false;
-        right.Controls.Add(_canvas, 0, 1);
+        editorAndPreview.Panel1.AutoScroll = true;
+        editorAndPreview.Panel1.Controls.Add(_canvas);
+
+        var previewPanel = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, Padding = new Padding(8) };
+        previewPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        previewPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        previewPanel.Controls.Add(
+            new Label { Text = "1x Preview", Dock = DockStyle.Fill, Height = 20, TextAlign = ContentAlignment.MiddleLeft },
+            0,
+            0);
+        _nativePreview.Dock = DockStyle.Top;
+        _nativePreview.SizeMode = PictureBoxSizeMode.Normal;
+        previewPanel.Controls.Add(_nativePreview, 0, 1);
+        editorAndPreview.Panel2.Controls.Add(previewPanel);
 
         _palettePanel.Dock = DockStyle.Fill;
         _palettePanel.WrapContents = true;
         _palettePanel.Height = 80;
-        right.Controls.Add(_palettePanel, 0, 2);
+        right.Controls.Add(_palettePanel, 0, 3);
 
         KeyPreview = true;
         KeyDown += MainFormOnKeyDown;
@@ -209,6 +241,7 @@ internal sealed class MainForm : Form
             }
 
             ReloadFrameList();
+            ReloadFrameStrip();
             BuildPalette();
             Redraw();
         }
@@ -288,6 +321,82 @@ internal sealed class MainForm : Form
         }
     }
 
+    private void ReloadFrameStrip()
+    {
+        foreach (Control control in _frameStrip.Controls)
+        {
+            if (control is Panel panel)
+            {
+                foreach (Control child in panel.Controls)
+                {
+                    if (child is PictureBox pictureBox)
+                    {
+                        pictureBox.Image?.Dispose();
+                    }
+                }
+            }
+        }
+
+        _frameStrip.Controls.Clear();
+        if (_document == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < _document.Frames.Count; i++)
+        {
+            var frameIndex = i;
+            var frame = _document.Frames[i];
+            var card = new Panel
+            {
+                Width = 86,
+                Height = 86,
+                Padding = new Padding(2),
+                Margin = new Padding(2),
+                BackColor = frameIndex == _currentFrameIndex ? Color.FromArgb(180, 210, 255) : Color.FromArgb(233, 236, 239),
+                Cursor = Cursors.Hand,
+            };
+
+            var thumbnail = new PictureBox
+            {
+                Width = 80,
+                Height = 64,
+                Top = 2,
+                Left = 2,
+                SizeMode = PictureBoxSizeMode.CenterImage,
+                Image = RenderFrameBitmap(frame, 2, false),
+                Cursor = Cursors.Hand,
+            };
+            var label = new Label
+            {
+                Text = $"#{frameIndex + 1}",
+                AutoSize = false,
+                Width = 80,
+                Height = 16,
+                Top = 68,
+                Left = 2,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Cursor = Cursors.Hand,
+            };
+
+            void SelectFrame(object? _, EventArgs __)
+            {
+                _currentFrameIndex = frameIndex;
+                _frameList.SelectedIndex = frameIndex;
+                ReloadFrameStrip();
+                Redraw();
+            }
+
+            card.Click += SelectFrame;
+            thumbnail.Click += SelectFrame;
+            label.Click += SelectFrame;
+
+            card.Controls.Add(thumbnail);
+            card.Controls.Add(label);
+            _frameStrip.Controls.Add(card);
+        }
+    }
+
     private void BuildPalette()
     {
         _palettePanel.Controls.Clear();
@@ -363,6 +472,7 @@ internal sealed class MainForm : Form
         _redoStacks.Insert(insertIndex, new Stack<byte[]>());
         _currentFrameIndex = insertIndex;
         ReloadFrameList();
+        ReloadFrameStrip();
         Redraw();
     }
 
@@ -379,6 +489,7 @@ internal sealed class MainForm : Form
         _redoStacks.Insert(insertIndex, new Stack<byte[]>());
         _currentFrameIndex = insertIndex;
         ReloadFrameList();
+        ReloadFrameStrip();
         Redraw();
     }
 
@@ -400,6 +511,7 @@ internal sealed class MainForm : Form
         _undoStacks.RemoveAt(removedIndex);
         _redoStacks.RemoveAt(removedIndex);
         ReloadFrameList();
+        ReloadFrameStrip();
         Redraw();
     }
 
@@ -502,6 +614,7 @@ internal sealed class MainForm : Form
 
         _currentFrameIndex = next;
         _frameList.SelectedIndex = next;
+        ReloadFrameStrip();
         Redraw();
     }
 
@@ -523,42 +636,53 @@ internal sealed class MainForm : Form
             return;
         }
 
-        var bmp = new Bitmap(frame.Width * _zoom, frame.Height * _zoom);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.Clear(Color.Black);
-            for (var y = 0; y < frame.Height; y++)
-            {
-                for (var x = 0; x < frame.Width; x++)
-                {
-                    var colorIndex = frame.Pixels[(y * frame.Width) + x] & 0x0F;
-                    using var brush = new SolidBrush(_document.Palette[colorIndex]);
-                    g.FillRectangle(brush, x * _zoom, y * _zoom, _zoom, _zoom);
-                }
-            }
-
-            if (_zoom >= 8)
-            {
-                using var pen = new Pen(Color.FromArgb(50, 50, 50));
-                for (var x = 0; x <= frame.Width; x++)
-                {
-                    g.DrawLine(pen, x * _zoom, 0, x * _zoom, frame.Height * _zoom);
-                }
-
-                for (var y = 0; y <= frame.Height; y++)
-                {
-                    g.DrawLine(pen, 0, y * _zoom, frame.Width * _zoom, y * _zoom);
-                }
-            }
-        }
+        var bmp = RenderFrameBitmap(frame, _zoom, _zoom >= 8);
+        var native = RenderFrameBitmap(frame, 1, false);
 
         _canvas.Image?.Dispose();
         _canvas.Image = bmp;
         _canvas.Width = bmp.Width;
         _canvas.Height = bmp.Height;
+        _nativePreview.Image?.Dispose();
+        _nativePreview.Image = native;
+        _nativePreview.Width = native.Width;
+        _nativePreview.Height = native.Height;
         _statusLabel.Text = $"{Path.GetFileName(_document.SourcePath)} | {_document.Kind.ToUpperInvariant()} | Frame {_currentFrameIndex + 1}/{_document.Frames.Count} | Zoom {_zoom}x";
+    }
+
+    private Bitmap RenderFrameBitmap(IndexedFrame frame, int scale, bool drawGrid)
+    {
+        var safeScale = Math.Max(1, scale);
+        var bmp = new Bitmap(frame.Width * safeScale, frame.Height * safeScale);
+        using var g = Graphics.FromImage(bmp);
+        g.InterpolationMode = InterpolationMode.NearestNeighbor;
+        g.PixelOffsetMode = PixelOffsetMode.Half;
+        g.Clear(Color.Black);
+        for (var y = 0; y < frame.Height; y++)
+        {
+            for (var x = 0; x < frame.Width; x++)
+            {
+                var colorIndex = frame.Pixels[(y * frame.Width) + x] & 0x0F;
+                using var brush = new SolidBrush(_document!.Palette[colorIndex]);
+                g.FillRectangle(brush, x * safeScale, y * safeScale, safeScale, safeScale);
+            }
+        }
+
+        if (drawGrid && safeScale >= 8)
+        {
+            using var pen = new Pen(Color.FromArgb(50, 50, 50));
+            for (var x = 0; x <= frame.Width; x++)
+            {
+                g.DrawLine(pen, x * safeScale, 0, x * safeScale, frame.Height * safeScale);
+            }
+
+            for (var y = 0; y <= frame.Height; y++)
+            {
+                g.DrawLine(pen, 0, y * safeScale, frame.Width * safeScale, y * safeScale);
+            }
+        }
+
+        return bmp;
     }
 
     private void ApplyStyle()
