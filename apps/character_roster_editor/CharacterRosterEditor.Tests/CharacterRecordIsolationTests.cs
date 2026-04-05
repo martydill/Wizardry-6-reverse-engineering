@@ -111,6 +111,8 @@ public sealed class CharacterRecordIsolationTests
             data[i] = (byte)((i * 37 + 11) & 0xFF);
         }
 
+        WriteAsciiName(data, "BASE");
+
         return data;
     }
 
