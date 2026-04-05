@@ -16,14 +16,16 @@ public sealed class CharacterRecordIsolationTests
     private static IEnumerable<FieldCase> FieldCases => BuildFieldCases();
 
     [TestCaseSource(nameof(FieldCases))]
-    public void Field_EditIsIsolated_AndRoundTripsInRecord(FieldCase fieldCase)
+    public void Field_EditIsIsolated_AndRoundTripsInRecord(object fieldCaseObject)
     {
+        var fieldCase = (FieldCase)fieldCaseObject;
         AssertRecordRoundTrip(fieldCase);
     }
 
     [TestCaseSource(nameof(FieldCases))]
-    public void Field_EditIsIsolated_AndRoundTripsInFile(FieldCase fieldCase)
+    public void Field_EditIsIsolated_AndRoundTripsInFile(object fieldCaseObject)
     {
+        var fieldCase = (FieldCase)fieldCaseObject;
         AssertFileRoundTrip(fieldCase);
     }
 
