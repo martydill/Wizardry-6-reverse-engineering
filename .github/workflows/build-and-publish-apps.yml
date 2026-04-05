@@ -1,0 +1,84 @@
+name: Build and Publish Apps
+
+on:
+  push:
+    paths:
+      - "apps/**"
+      - ".github/workflows/build-and-publish-apps.yml"
+  pull_request:
+    paths:
+      - "apps/**"
+      - ".github/workflows/build-and-publish-apps.yml"
+  workflow_dispatch:
+
+env:
+  VERSION_PREFIX: "1.0"
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Run Character Roster Editor tests
+        run: dotnet test apps/character_roster_editor/CharacterRosterEditor.Tests/CharacterRosterEditor.Tests.csproj --configuration Release
+
+      - name: Run PIC Editor tests
+        run: dotnet test apps/pic_editor/PicEditor.Tests/PicEditor.Tests.csproj --configuration Release
+
+  publish:
+    needs: test
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app_name: CharacterRosterEditor
+            project_path: apps/character_roster_editor/CharacterRosterEditor/CharacterRosterEditor.csproj
+            output_dir: apps/character_roster_editor/CharacterRosterEditor/bin/Release/net48
+          - app_name: PicEditor
+            project_path: apps/pic_editor/PicEditor/PicEditor.csproj
+            output_dir: apps/pic_editor/PicEditor/bin/Release/net48
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Compute auto-incremented version
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION_PREFIX }}.${{ github.run_number }}"
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Using version: $version"
+
+      - name: Build ${{ matrix.app_name }}
+        run: >
+          dotnet build ${{ matrix.project_path }}
+          --configuration Release
+          /p:Version=${{ env.APP_VERSION }}
+          /p:FileVersion=${{ env.APP_VERSION }}
+          /p:AssemblyVersion=${{ env.APP_VERSION }}.0
+
+      - name: Prepare artifact folder
+        shell: pwsh
+        run: |
+          $target = "artifacts/${{ matrix.app_name }}-$env:APP_VERSION"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item "${{ matrix.output_dir }}/*" -Destination $target -Recurse -Force
+
+      - name: Upload ${{ matrix.app_name }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app_name }}-${{ env.APP_VERSION }}
+          path: artifacts/${{ matrix.app_name }}-${{ env.APP_VERSION }}
