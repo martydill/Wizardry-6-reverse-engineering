@@ -13,14 +13,18 @@ public sealed class CharacterRecordIsolationTests
     private const int FirstRecordOffset = 0x18;
     private const int SlotCount = 2;
 
-    [Test]
-    public void EveryKnownField_EditIsIsolated_AndRoundTripsInRecordAndFile()
+    private static IEnumerable<FieldCase> FieldCases => BuildFieldCases();
+
+    [TestCaseSource(nameof(FieldCases))]
+    public void Field_EditIsIsolated_AndRoundTripsInRecord(FieldCase fieldCase)
     {
-        foreach (var fieldCase in BuildFieldCases())
-        {
-            AssertRecordRoundTrip(fieldCase);
-            AssertFileRoundTrip(fieldCase);
-        }
+        AssertRecordRoundTrip(fieldCase);
+    }
+
+    [TestCaseSource(nameof(FieldCases))]
+    public void Field_EditIsIsolated_AndRoundTripsInFile(FieldCase fieldCase)
+    {
+        AssertFileRoundTrip(fieldCase);
     }
 
     private static void AssertRecordRoundTrip(FieldCase fieldCase)
@@ -280,5 +284,10 @@ public sealed class CharacterRecordIsolationTests
         public Action<CharacterRecord> Assert { get; }
 
         public IReadOnlyCollection<int> ChangedOffsets { get; }
+
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 }
