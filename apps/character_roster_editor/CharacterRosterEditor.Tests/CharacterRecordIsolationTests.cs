@@ -269,7 +269,7 @@ public sealed class CharacterRecordIsolationTests
         return result;
     }
 
-    public sealed class FieldCase
+    private sealed class FieldCase
     {
         public FieldCase(string name, Action<CharacterRecord> mutate, Action<CharacterRecord> assert, int[] changedOffsets)
         {
