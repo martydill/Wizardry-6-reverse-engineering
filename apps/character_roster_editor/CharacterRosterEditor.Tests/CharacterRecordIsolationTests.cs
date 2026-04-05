@@ -81,6 +81,8 @@ public sealed class CharacterRecordIsolationTests
         var headerPayload = Enumerable.Range(0, FirstRecordOffset - 6).Select(i => (byte)((i * 13 + 7) & 0xFF)).ToArray();
         var record0 = BuildPatternedRecord(RecordSize);
         var record1 = BuildPatternedRecord(RecordSize).Select(b => (byte)(b ^ 0x5A)).ToArray();
+        WriteAsciiName(record0, "REC0");
+        WriteAsciiName(record1, "REC1");
 
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
@@ -92,6 +94,13 @@ public sealed class CharacterRecordIsolationTests
         writer.Write(record1);
         writer.Flush();
         return ms.ToArray();
+    }
+
+    private static void WriteAsciiName(byte[] record, string name)
+    {
+        var safe = (name ?? string.Empty).PadRight(8, '\0').Substring(0, 8);
+        var bytes = System.Text.Encoding.ASCII.GetBytes(safe);
+        Buffer.BlockCopy(bytes, 0, record, 0, 8);
     }
 
     private static byte[] BuildPatternedRecord(int size)
