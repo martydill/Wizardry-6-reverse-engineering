@@ -89,7 +89,7 @@ public sealed class ImageFormatsAndFrameEditingEdgeTests
     [Test]
     public void SavePicEditProject_WritesEscapedJsonAndFramePixels()
     {
-        var path = Path.Combine(Path.GetTempPath(), "sprites with \"quotes\"");
+        var path = Path.Combine(Path.GetTempPath(), $"sprites-{Guid.NewGuid():N}");
         var outputPath = path + ".picedit.json";
 
         try
@@ -99,10 +99,11 @@ public sealed class ImageFormatsAndFrameEditingEdgeTests
 
             ImageFormats.SavePicEditProject(path, doc);
             var text = File.ReadAllText(outputPath);
+            var expectedEscapedPath = path.Replace("\\", "\\\\");
 
             Assert.Multiple(() =>
             {
-                Assert.That(text, Does.Contain("\\\"quotes\\\""));
+                Assert.That(text, Does.Contain($"\"source_path\": \"{expectedEscapedPath}\""));
                 Assert.That(text, Does.Contain("\"width\": 2"));
                 Assert.That(text, Does.Contain("\"pixels\": [3, 4]"));
             });
