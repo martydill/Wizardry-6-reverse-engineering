@@ -33,7 +33,8 @@ internal sealed class MainForm : Form
     private readonly ComboBox _raceCombo = new ComboBox();
     private readonly ComboBox _genderCombo = new ComboBox();
     private readonly ComboBox _classCombo = new ComboBox();
-    private readonly FlowLayoutPanel _statsPanel = new FlowLayoutPanel();
+    private readonly TableLayoutPanel _statsPanel = new TableLayoutPanel();
+    private readonly NumericUpDown[] _statEditors = new NumericUpDown[8];
     private readonly PictureBox _portraitPictureBox = new PictureBox();
     private readonly Label _portraitInfoLabel = new Label();
     private readonly Button _portraitPrevButton = new Button();
@@ -145,25 +146,11 @@ internal sealed class MainForm : Form
         layout.Controls.Add(identityAndStats, 0, 0);
         layout.SetColumnSpan(identityAndStats, 2);
 
-        AddEditorRow(layout, 1, "HP Current", ConfigureNumeric(_hpCurNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 2, "HP Max", ConfigureNumeric(_hpMaxNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 3, "Stamina Cur", ConfigureNumeric(_staminaCurNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 4, "Stamina Max", ConfigureNumeric(_staminaMaxNumeric, 0, ushort.MaxValue));
-        AddEditorRow(layout, 5, "Load Cur (x10)", ConfigureNumeric(_loadCurNumeric, 0, 65535));
-        AddEditorRow(layout, 6, "Load Max (x10)", ConfigureNumeric(_loadMaxNumeric, 0, 65535));
-
         PopulateCombo(_raceCombo, LookupTables.Races);
         PopulateCombo(_genderCombo, LookupTables.Genders);
         PopulateCombo(_classCombo, LookupTables.Classes);
 
-        AddEditorRow(layout, 7, "Race", _raceCombo);
-        AddEditorRow(layout, 8, "Gender", _genderCombo);
-        AddEditorRow(layout, 9, "Class", _classCombo);
-        AddEditorRow(layout, 10, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
-        AddEditorRow(layout, 11, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
-        AddEditorRow(layout, 12, "Portrait", BuildPortraitPreviewPanel());
-
-        AddEditorRow(layout, 13, string.Empty, CreateButton("Apply Changes", (_, __) => ApplyEditorValues()));
+        AddEditorRow(layout, 1, string.Empty, CreateButton("Apply Changes", (_, __) => ApplyEditorValues()));
 
         WireEditorEvents();
         panel.Controls.Add(layout);
@@ -181,14 +168,29 @@ internal sealed class MainForm : Form
         };
         section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        section.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var identity = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+        var identity = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Anchor = AnchorStyles.Top | AnchorStyles.Left };
         identity.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         AddEditorRow(identity, 0, "Name", _nameTextBox);
         AddEditorRow(identity, 1, "Age (Years)", _ageNumeric);
         AddEditorRow(identity, 2, "Level", _levelNumeric);
         AddEditorRow(identity, 3, "Rank", _rankNumeric);
+        AddEditorRow(identity, 4, "HP Current", ConfigureNumeric(_hpCurNumeric, 0, ushort.MaxValue));
+        AddEditorRow(identity, 5, "HP Max", ConfigureNumeric(_hpMaxNumeric, 0, ushort.MaxValue));
+        AddEditorRow(identity, 6, "Stamina Cur", ConfigureNumeric(_staminaCurNumeric, 0, ushort.MaxValue));
+        AddEditorRow(identity, 7, "Stamina Max", ConfigureNumeric(_staminaMaxNumeric, 0, ushort.MaxValue));
+        AddEditorRow(identity, 8, "Load Cur (x10)", ConfigureNumeric(_loadCurNumeric, 0, 65535));
+        AddEditorRow(identity, 9, "Load Max (x10)", ConfigureNumeric(_loadMaxNumeric, 0, 65535));
+        AddEditorRow(identity, 10, "Race", _raceCombo);
+        AddEditorRow(identity, 11, "Gender", _genderCombo);
+        AddEditorRow(identity, 12, "Class", _classCombo);
+        AddEditorRow(identity, 13, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
+        AddEditorRow(identity, 14, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
+        AddEditorRow(identity, 15, "Portrait", BuildPortraitPreviewPanel());
+
+        _statsPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
 
         section.Controls.Add(identity, 0, 0);
         section.Controls.Add(_statsPanel, 1, 0);
@@ -197,23 +199,40 @@ internal sealed class MainForm : Form
 
     private void BuildStatsEditor()
     {
-        _statsPanel.Dock = DockStyle.Fill;
+        _statsPanel.Controls.Clear();
+        _statsPanel.Dock = DockStyle.Top;
         _statsPanel.AutoSize = true;
-        _statsPanel.WrapContents = false;
-        _statsPanel.AutoScroll = true;
-        _statsPanel.Height = 72;
-        _statsPanel.FlowDirection = FlowDirection.LeftToRight;
+        _statsPanel.ColumnCount = 2;
+        _statsPanel.RowCount = 8;
+        _statsPanel.GrowStyle = TableLayoutPanelGrowStyle.FixedSize;
+        _statsPanel.AutoScroll = false;
+        _statsPanel.ColumnStyles.Clear();
+        _statsPanel.RowStyles.Clear();
+        _statsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+        _statsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
 
         var statNames = new[] { "STR", "INT", "PIE", "VIT", "DEX", "SPD", "PER", "KAR" };
         for (var i = 0; i < statNames.Length; i++)
         {
-            var container = new Panel { Width = 90, Height = 64 };
-            var label = new Label { Text = statNames[i], Dock = DockStyle.Top, Height = 20, TextAlign = ContentAlignment.MiddleLeft };
-            var numeric = new NumericUpDown { Name = $"Stat{i}", Minimum = 0, Maximum = 255, Width = 80, Height = 28, Top = 26 };
+            _statsPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+            var numeric = new NumericUpDown { Name = $"Stat{i}", Minimum = 0, Maximum = 255 };
+            ConfigureNumeric(numeric, 0, 255);
+            numeric.Anchor = AnchorStyles.Left;
+            numeric.Margin = new Padding(0, 4, 0, 4);
             numeric.ValueChanged += (_, __) => ApplyEditorValues();
-            container.Controls.Add(numeric);
-            container.Controls.Add(label);
-            _statsPanel.Controls.Add(container);
+            _statEditors[i] = numeric;
+
+            var label = new Label
+            {
+                Text = statNames[i],
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 0, 8, 0),
+            };
+
+            _statsPanel.Controls.Add(label, 0, i);
+            _statsPanel.Controls.Add(numeric, 1, i);
         }
     }
 
@@ -386,10 +405,7 @@ internal sealed class MainForm : Form
 
         for (var i = 0; i < 8; i++)
         {
-            if (_statsPanel.Controls[i] is Panel p && p.Controls.OfType<NumericUpDown>().FirstOrDefault() is NumericUpDown numeric)
-            {
-                selected.Stats[i] = (byte)numeric.Value;
-            }
+            selected.Stats[i] = (byte)_statEditors[i].Value;
         }
 
         _grid.Refresh();
@@ -427,10 +443,7 @@ internal sealed class MainForm : Form
 
         for (var i = 0; i < 8; i++)
         {
-            if (_statsPanel.Controls[i] is Panel p && p.Controls.OfType<NumericUpDown>().FirstOrDefault() is NumericUpDown numeric)
-            {
-                numeric.Value = selected.Stats[i];
-            }
+            _statEditors[i].Value = selected.Stats[i];
         }
 
         RefreshSpellPointsGrid(selected);
