@@ -161,8 +161,6 @@ internal sealed class MainForm : Form
         PopulateCombo(_genderCombo, LookupTables.Genders);
         PopulateCombo(_classCombo, LookupTables.Classes);
 
-        AddEditorRow(layout, 1, string.Empty, CreateButton("Apply Changes", (_, __) => ApplyEditorValues()));
-
         WireEditorEvents();
         panel.Controls.Add(layout);
         return panel;
