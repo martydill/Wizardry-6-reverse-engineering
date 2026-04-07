@@ -692,8 +692,7 @@ internal sealed class MainForm : Form
         yield return baseDirectory;
         yield return Path.Combine(baseDirectory, "gamedata");
 
-        var parent = Directory.GetParent(baseDirectory)?.FullName;
-        if (!string.IsNullOrWhiteSpace(parent))
+        if (Directory.GetParent(baseDirectory)?.FullName is string parent && !string.IsNullOrWhiteSpace(parent))
         {
             yield return parent;
             yield return Path.Combine(parent, "gamedata");
