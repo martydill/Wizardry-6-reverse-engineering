@@ -47,6 +47,7 @@ internal sealed class MainForm : Form
     private string? _currentPath;
     private PcfileDocument? _document;
     private bool _isUpdatingUi;
+    private bool _hasUnsavedChanges;
     private readonly System.Collections.Generic.Dictionary<string, Bitmap[]> _portraitFramesByFile =
         new System.Collections.Generic.Dictionary<string, Bitmap[]>(StringComparer.OrdinalIgnoreCase);
 
@@ -59,6 +60,16 @@ internal sealed class MainForm : Form
 
         BuildUi();
         ApplyStyle();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!e.Cancel && !ConfirmCloseWithUnsavedChanges())
+        {
+            e.Cancel = true;
+        }
+
+        base.OnFormClosing(e);
     }
 
     private void BuildUi()
@@ -408,6 +419,7 @@ internal sealed class MainForm : Form
             selected.Stats[i] = (byte)_statEditors[i].Value;
         }
 
+        MarkDirty();
         _grid.Refresh();
     }
 
@@ -494,6 +506,7 @@ internal sealed class MainForm : Form
         const int portraitCount = 28;
         var nextIndex = (selected.PortraitIndex + delta + portraitCount) % portraitCount;
         selected.PortraitIndex = (byte)nextIndex;
+        MarkDirty();
         RefreshPortraitPreview(selected);
         _grid.Refresh();
     }
@@ -545,6 +558,8 @@ internal sealed class MainForm : Form
             selected.SpellPointsCurrent[i] = ParseUShortCell(row.Cells[1].Value);
             selected.SpellPointsMax[i] = ParseUShortCell(row.Cells[2].Value);
         }
+
+        MarkDirty();
     }
 
     private void ApplySkillsGrid()
@@ -579,6 +594,8 @@ internal sealed class MainForm : Form
 
             selected.Skills[skillIndex] = ParseByteCell(_skillsGrid.Rows[rowIndex].Cells[2].Value);
         }
+
+        MarkDirty();
     }
 
     private void ApplyInventoryGrid()
@@ -605,6 +622,8 @@ internal sealed class MainForm : Form
             entry.Byte6 = ParseByteCell(row.Cells[5].Value);
             entry.Byte7 = ParseByteCell(row.Cells[6].Value);
         }
+
+        MarkDirty();
     }
 
     private void ApplyKnownSpellsHex()
@@ -632,6 +651,8 @@ internal sealed class MainForm : Form
             {
                 selected.KnownSpellsBitset[i] = byte.Parse(text.Substring(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
             }
+
+            MarkDirty();
         }
         catch (FormatException)
         {
@@ -650,6 +671,11 @@ internal sealed class MainForm : Form
 
     private void OpenFile()
     {
+        if (!ConfirmCloseWithUnsavedChanges())
+        {
+            return;
+        }
+
         using (var dialog = new OpenFileDialog())
         {
             dialog.Filter = "Wizardry PCFILE (*.dbs)|*.dbs|All files (*.*)|*.*";
@@ -668,6 +694,7 @@ internal sealed class MainForm : Form
                 }
 
                 Text = $"Wizardry 6 Character Roster Editor - {Path.GetFileName(_currentPath)}";
+                _hasUnsavedChanges = false;
                 if (_records.Count > 0)
                 {
                     _grid.Rows[0].Selected = true;
@@ -830,12 +857,12 @@ internal sealed class MainForm : Form
         return null;
     }
 
-    private void SaveFile(bool forceChoosePath)
+    private bool SaveFile(bool forceChoosePath)
     {
         if (_document == null)
         {
             MessageBox.Show(this, "Load a file first.", "No document", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            return false;
         }
 
         var outputPath = _currentPath;
@@ -849,7 +876,7 @@ internal sealed class MainForm : Form
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                 {
-                    return;
+                    return false;
                 }
 
                 outputPath = dialog.FileName;
@@ -864,8 +891,10 @@ internal sealed class MainForm : Form
 
         _document.Save(outputPath!);
         _currentPath = outputPath;
+        _hasUnsavedChanges = false;
 
         MessageBox.Show(this, "Roster saved successfully.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        return true;
     }
 
     private void DeleteSelectedCharacter()
@@ -896,8 +925,41 @@ internal sealed class MainForm : Form
         }
 
         selected.Clear();
+        MarkDirty();
         LoadSelectionIntoEditor();
         _grid.Refresh();
+    }
+
+    private void MarkDirty()
+    {
+        _hasUnsavedChanges = true;
+    }
+
+    private bool ConfirmCloseWithUnsavedChanges()
+    {
+        if (!_hasUnsavedChanges)
+        {
+            return true;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            "You have unsaved changes. Save before closing?",
+            "Unsaved changes",
+            MessageBoxButtons.YesNoCancel,
+            MessageBoxIcon.Warning);
+
+        if (result == DialogResult.Cancel)
+        {
+            return false;
+        }
+
+        if (result == DialogResult.Yes)
+        {
+            return SaveFile(false);
+        }
+
+        return true;
     }
 
     private Button CreateButton(string text, EventHandler onClick)
