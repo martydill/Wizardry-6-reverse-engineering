@@ -34,6 +34,7 @@ public sealed class CharacterRecordBehaviorTests
             Assert.That(record.KnownSpellsBitset, Is.All.EqualTo((byte)0));
             Assert.That(record.SpellPointsCurrent, Is.All.EqualTo((ushort)0));
             Assert.That(record.SpellPointsMax, Is.All.EqualTo((ushort)0));
+            Assert.That(record.PortraitIndex, Is.EqualTo((byte)0));
             Assert.That(record.Inventory.All(i => i.ItemId == 0 && i.LoadTenths == 0 && i.Byte4 == 0 && i.Byte5 == 0 && i.Byte6 == 0 && i.Byte7 == 0), Is.True);
             Assert.That(record.RawRecordBytes.Length, Is.EqualTo(0x01B0));
             Assert.That(record.RawRecordBytes, Is.All.EqualTo((byte)0));

@@ -155,6 +155,7 @@ public sealed class CharacterRecordIsolationTests
             new("RaceId", r => r.RaceId = 9, r => Assert.That(r.RaceId, Is.EqualTo((byte)9)), new[] { 0x19D }),
             new("GenderId", r => r.GenderId = 1, r => Assert.That(r.GenderId, Is.EqualTo((byte)1)), new[] { 0x19E }),
             new("ClassId", r => r.ClassId = 13, r => Assert.That(r.ClassId, Is.EqualTo((byte)13)), new[] { 0x19F }),
+            new("PortraitIndex", r => r.PortraitIndex = 23, r => Assert.That(r.PortraitIndex, Is.EqualTo((byte)23)), new[] { 0x19C }),
             new("InventoryPage1Count", r => r.InventoryPage1Count = 4, r => Assert.That(r.InventoryPage1Count, Is.EqualTo((byte)4)), new[] { 0x1AC }),
             new("InventoryPage2Count", r => r.InventoryPage2Count = 6, r => Assert.That(r.InventoryPage2Count, Is.EqualTo((byte)6)), new[] { 0x1AD }),
             new("PortraitFileSelector", r => r.PortraitFileSelector = 1, r => Assert.That(r.PortraitFileSelector, Is.EqualTo((byte)1)), new[] { 0x1A9 }),

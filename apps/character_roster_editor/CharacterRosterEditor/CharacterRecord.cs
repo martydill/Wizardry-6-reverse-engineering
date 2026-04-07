@@ -57,6 +57,8 @@ internal sealed class CharacterRecord
 
     public byte InventoryPage2Count { get; set; }
 
+    public byte PortraitIndex { get; set; }
+
     public byte PortraitFileSelector { get; set; }
 
     public byte PortraitFrameSelector { get; set; }
@@ -84,6 +86,7 @@ internal sealed class CharacterRecord
         ClassId = 0;
         InventoryPage1Count = 0;
         InventoryPage2Count = 0;
+        PortraitIndex = 0;
         PortraitFileSelector = 0;
         PortraitFrameSelector = 0;
 
@@ -135,6 +138,7 @@ internal sealed class CharacterRecord
         Buffer.BlockCopy(data, 0x12C, record.Stats, 0, 8);
         Buffer.BlockCopy(data, 0x134, record.Skills, 0, 30);
         Buffer.BlockCopy(data, 0x188, record.KnownSpellsBitset, 0, 12);
+        record.PortraitIndex = data[0x19C];
         record.InventoryPage1Count = data[0x1AC];
         record.InventoryPage2Count = data[0x1AD];
         record.PortraitFileSelector = data[0x1A9];
@@ -180,6 +184,7 @@ internal sealed class CharacterRecord
         WriteUInt16(result, 0x022, LoadMaxTenths);
         WriteUInt16(result, 0x024, Rank);
         WriteUInt16(result, 0x026, Level);
+        result[0x19C] = PortraitIndex;
         result[0x1AC] = InventoryPage1Count;
         result[0x1AD] = InventoryPage2Count;
         result[0x1A9] = PortraitFileSelector;

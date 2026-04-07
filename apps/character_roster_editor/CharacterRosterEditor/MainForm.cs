@@ -36,6 +36,8 @@ internal sealed class MainForm : Form
     private readonly FlowLayoutPanel _statsPanel = new FlowLayoutPanel();
     private readonly PictureBox _portraitPictureBox = new PictureBox();
     private readonly Label _portraitInfoLabel = new Label();
+    private readonly Button _portraitPrevButton = new Button();
+    private readonly Button _portraitNextButton = new Button();
     private readonly DataGridView _spellPointsGrid = new DataGridView();
     private readonly DataGridView _skillsGrid = new DataGridView();
     private readonly DataGridView _inventoryGrid = new DataGridView();
@@ -314,7 +316,25 @@ internal sealed class MainForm : Form
         _portraitInfoLabel.AutoSize = true;
         _portraitInfoLabel.Text = "No portrait loaded.";
 
+        _portraitPrevButton.Text = "<";
+        _portraitPrevButton.AutoSize = true;
+        _portraitPrevButton.Click += (_, __) => CyclePortraitIndex(-1);
+
+        _portraitNextButton.Text = ">";
+        _portraitNextButton.AutoSize = true;
+        _portraitNextButton.Click += (_, __) => CyclePortraitIndex(1);
+
+        var navPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = true,
+        };
+        navPanel.Controls.Add(_portraitPrevButton);
+        navPanel.Controls.Add(_portraitNextButton);
+
         panel.Controls.Add(_portraitPictureBox);
+        panel.Controls.Add(navPanel);
         panel.Controls.Add(_portraitInfoLabel);
         return panel;
     }
@@ -380,6 +400,10 @@ internal sealed class MainForm : Form
         var selected = GetSelectedRecord();
         if (selected == null)
         {
+            _portraitPictureBox.Image = null;
+            _portraitInfoLabel.Text = "No portrait loaded.";
+            _portraitPrevButton.Enabled = false;
+            _portraitNextButton.Enabled = false;
             return;
         }
 
@@ -420,14 +444,16 @@ internal sealed class MainForm : Form
 
     private void RefreshPortraitPreview(CharacterRecord selected)
     {
+        var portraitIndexRaw = selected.PortraitIndex;
         var portraitFileRaw = selected.PortraitFileSelector;
         var portraitFrameRaw = selected.PortraitFrameSelector;
-        var portraitIndexRaw = selected.RawRecordBytes.Length > 0x1AB ? selected.RawRecordBytes[0x1AB] : (byte)0;
-        var portrait = ResolvePortraitReference(portraitFileRaw, portraitFrameRaw);
+        _portraitPrevButton.Enabled = true;
+        _portraitNextButton.Enabled = true;
+        var portrait = ResolvePortraitReference(portraitIndexRaw, portraitFileRaw, portraitFrameRaw);
         if (portrait == null)
         {
             _portraitPictureBox.Image = null;
-            _portraitInfoLabel.Text = $"Portrait not available (raw 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}, 0x1AB={portraitIndexRaw}).";
+            _portraitInfoLabel.Text = $"Portrait not available (raw 0x19C={portraitIndexRaw}, 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}).";
             return;
         }
 
@@ -441,7 +467,22 @@ internal sealed class MainForm : Form
         }
 
         _portraitPictureBox.Image = ScaleNearest(frames[portrait.Value.FrameIndex], 4);
-        _portraitInfoLabel.Text = $"{portrait.Value.FileName} frame {portrait.Value.FrameIndex} via {portrait.Value.Source} (raw: 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw}, 0x1AB={portraitIndexRaw})";
+        _portraitInfoLabel.Text = $"{portrait.Value.FileName} frame {portrait.Value.FrameIndex} via {portrait.Value.Source} (raw: 0x19C={portraitIndexRaw}, 0x1A9={portraitFileRaw}, 0x1AA={portraitFrameRaw})";
+    }
+
+    private void CyclePortraitIndex(int delta)
+    {
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            return;
+        }
+
+        const int portraitCount = 28;
+        var nextIndex = (selected.PortraitIndex + delta + portraitCount) % portraitCount;
+        selected.PortraitIndex = (byte)nextIndex;
+        RefreshPortraitPreview(selected);
+        _grid.Refresh();
     }
 
     private void RefreshSpellPointsGrid(CharacterRecord selected)
@@ -633,8 +674,8 @@ internal sealed class MainForm : Form
         }
 
         var resolvedDirectory = directory!;
-        LoadPortraitFile(resolvedDirectory, "WPORT0.EGA");
         LoadPortraitFile(resolvedDirectory, "WPORT1.EGA");
+        LoadPortraitFile(resolvedDirectory, "WPORT2.EGA");
     }
 
     private void LoadPortraitFile(string directory, string fileName)
@@ -748,24 +789,29 @@ internal sealed class MainForm : Form
         return output;
     }
 
-    private static (string FileName, int FrameIndex, string Source)? ResolvePortraitReference(byte raw1A9, byte raw1AA)
+    private static (string FileName, int FrameIndex, string Source)? ResolvePortraitReference(byte portraitIndex, byte raw1A9, byte raw1AA)
     {
+        if (portraitIndex < 28)
+        {
+            return (portraitIndex < 14 ? "WPORT1.EGA" : "WPORT2.EGA", portraitIndex % 14, "0x19C portrait index");
+        }
+
         if (raw1A9 <= 1)
         {
             if (raw1AA < 14)
             {
-                return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA, "0x1A9+0x1AA (0-based)");
+                return (raw1A9 == 0 ? "WPORT1.EGA" : "WPORT2.EGA", raw1AA, "0x1A9+0x1AA (0-based)");
             }
 
             if (raw1AA is >= 1 and <= 14)
             {
-                return (raw1A9 == 0 ? "WPORT0.EGA" : "WPORT1.EGA", raw1AA - 1, "0x1A9+0x1AA (1-based)");
+                return (raw1A9 == 0 ? "WPORT1.EGA" : "WPORT2.EGA", raw1AA - 1, "0x1A9+0x1AA (1-based)");
             }
         }
 
         if (raw1A9 < 28)
         {
-            return (raw1A9 < 14 ? "WPORT0.EGA" : "WPORT1.EGA", raw1A9 % 14, "0x1A9 absolute");
+            return (raw1A9 < 14 ? "WPORT1.EGA" : "WPORT2.EGA", raw1A9 % 14, "0x1A9 absolute");
         }
 
         return null;
