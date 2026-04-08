@@ -15,6 +15,7 @@ internal sealed class MainForm : Form
     private readonly PictureBox _nativePreview = new PictureBox();
     private readonly FlowLayoutPanel _palettePanel = new FlowLayoutPanel();
     private readonly NumericUpDown _zoomNumeric = new NumericUpDown();
+    private readonly CheckBox _showGridCheckBox = new CheckBox();
     private readonly Label _statusLabel = new Label();
 
     private readonly List<Stack<byte[]>> _undoStacks = new List<Stack<byte[]>>();
@@ -73,6 +74,12 @@ internal sealed class MainForm : Form
         };
         zoomPanel.Controls.Add(_zoomNumeric);
         left.Controls.Add(zoomPanel, 0, 3);
+
+        _showGridCheckBox.Text = "Show Grid";
+        _showGridCheckBox.AutoSize = true;
+        _showGridCheckBox.Checked = true;
+        _showGridCheckBox.CheckedChanged += (_, __) => Redraw();
+        left.Controls.Add(_showGridCheckBox, 0, 4);
 
         left.Controls.Add(new Label { Text = "Frames", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft }, 0, 5);
         _frameList.Height = 44;
@@ -658,7 +665,7 @@ internal sealed class MainForm : Form
             return;
         }
 
-        var bmp = RenderFrameBitmap(frame, _zoom, _zoom >= 8);
+        var bmp = RenderFrameBitmap(frame, _zoom, _showGridCheckBox.Checked);
         var native = RenderFrameBitmap(frame, 1, false);
 
         _canvas.Image?.Dispose();
@@ -690,7 +697,7 @@ internal sealed class MainForm : Form
             }
         }
 
-        if (drawGrid && safeScale >= 8)
+        if (drawGrid)
         {
             using var pen = new Pen(Color.FromArgb(50, 50, 50));
             for (var x = 0; x <= frame.Width; x++)
