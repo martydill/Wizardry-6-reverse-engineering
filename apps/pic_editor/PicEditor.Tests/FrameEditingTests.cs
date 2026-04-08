@@ -112,6 +112,49 @@ public sealed class FrameEditingTests
         }
     }
 
+    [Test]
+    public void SavePic_AndReload_PreservesEditedPixels()
+    {
+        var doc = new SpriteDocument
+        {
+            Kind = "pic",
+            Palette = SpriteDocument.DefaultPalette,
+        };
+
+        var firstPixels = new byte[16 * 8];
+        firstPixels[0] = 5;
+        firstPixels[15] = 7;
+        var secondPixels = new byte[8 * 16];
+        secondPixels[8] = 12;
+        secondPixels[120] = 3;
+        doc.Frames.Add(new IndexedFrame { Width = 16, Height = 8, Pixels = firstPixels });
+        doc.Frames.Add(new IndexedFrame { Width = 8, Height = 16, Pixels = secondPixels });
+
+        var path = Path.Combine(Path.GetTempPath(), $"sprite-{System.Guid.NewGuid():N}.pic");
+        try
+        {
+            ImageFormats.SavePic(path, doc);
+            var reloaded = ImageFormats.Load(path);
+            Assert.That(reloaded.Kind, Is.EqualTo("pic"));
+            Assert.That(reloaded.Frames.Count, Is.EqualTo(2));
+            Assert.That(reloaded.Frames[0].Width, Is.EqualTo(16));
+            Assert.That(reloaded.Frames[0].Height, Is.EqualTo(8));
+            Assert.That(reloaded.Frames[0].Pixels[0], Is.EqualTo((byte)5));
+            Assert.That(reloaded.Frames[0].Pixels[15], Is.EqualTo((byte)7));
+            Assert.That(reloaded.Frames[1].Width, Is.EqualTo(8));
+            Assert.That(reloaded.Frames[1].Height, Is.EqualTo(16));
+            Assert.That(reloaded.Frames[1].Pixels[8], Is.EqualTo((byte)12));
+            Assert.That(reloaded.Frames[1].Pixels[120], Is.EqualTo((byte)3));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     private static IndexedFrame NewFrame(int width, int height, byte[] pixels) =>
         new IndexedFrame { Width = width, Height = height, Pixels = pixels };
 }

@@ -291,14 +291,8 @@ internal sealed class MainForm : Form
             }
             else
             {
-                ImageFormats.SavePicEditProject(targetPath, _document);
-                _statusLabel.Text = $"Saved PIC edit sidecar: {targetPath}.picedit.json";
-                MessageBox.Show(
-                    this,
-                    "PIC binary re-encoding is not implemented yet.\nSaved editable frame data to .picedit.json.",
-                    "PIC save",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                ImageFormats.SavePic(targetPath, _document);
+                _statusLabel.Text = $"Saved PIC: {targetPath}";
             }
 
             _document.SourcePath = targetPath;

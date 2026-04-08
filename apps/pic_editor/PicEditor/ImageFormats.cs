@@ -60,6 +60,8 @@ internal static class ImageFormats
     private const int MaxPicFrames = 256;
     private const int MaxPicWidthTiles = 64;
     private const int MaxPicHeightTiles = 64;
+    private const int MaxPicMaskBytes = 20;
+    private const int MaxPicMaskTiles = MaxPicMaskBytes * 8;
     private const int TileByteSize = 32;
 
     public static SpriteDocument Load(string path)
@@ -139,6 +141,66 @@ internal static class ImageFormats
 
         var outputPath = path + ".picedit.json";
         File.WriteAllText(outputPath, sb.ToString(), Encoding.UTF8);
+    }
+
+    public static void SavePic(string path, SpriteDocument document)
+    {
+        if (document.Frames.Count == 0)
+        {
+            throw new InvalidDataException("PIC save requires at least one frame.");
+        }
+
+        if (document.Frames.Count > MaxPicFrames)
+        {
+            throw new InvalidDataException($"PIC save supports at most {MaxPicFrames} frames.");
+        }
+
+        const int recordSize = 24;
+        var headerSize = checked(document.Frames.Count * recordSize);
+        if (headerSize > ushort.MaxValue)
+        {
+            throw new InvalidDataException("PIC header exceeds 16-bit size limit.");
+        }
+
+        var header = new byte[headerSize];
+        var payload = new List<byte>();
+
+        for (var i = 0; i < document.Frames.Count; i++)
+        {
+            var frame = document.Frames[i];
+            ValidatePicFrame(frame, i);
+
+            var widthTiles = frame.Width / 8;
+            var heightTiles = frame.Height / 8;
+            var tileCount = checked(widthTiles * heightTiles);
+            var frameOffset = checked(headerSize + payload.Count);
+            if (frameOffset > ushort.MaxValue)
+            {
+                throw new InvalidDataException("PIC payload offset exceeds 16-bit limit.");
+            }
+
+            var recordOffset = i * recordSize;
+            WriteUInt16(header, recordOffset, (ushort)frameOffset);
+            WriteUInt16(header, recordOffset + 2, (ushort)((heightTiles << 8) | widthTiles));
+
+            var mask = new byte[MaxPicMaskBytes];
+            for (var tileIndex = 0; tileIndex < tileCount; tileIndex++)
+            {
+                mask[tileIndex / 8] |= (byte)(1 << (tileIndex % 8));
+            }
+
+            Buffer.BlockCopy(mask, 0, header, recordOffset + 4, mask.Length);
+            payload.AddRange(EncodeTiledPlanar(frame));
+        }
+
+        var decompressed = new byte[header.Length + payload.Count];
+        Buffer.BlockCopy(header, 0, decompressed, 0, header.Length);
+        if (payload.Count > 0)
+        {
+            Buffer.BlockCopy(payload.ToArray(), 0, decompressed, header.Length, payload.Count);
+        }
+
+        File.WriteAllBytes(path, EncodePicRle(decompressed));
     }
 
     private static SpriteDocument LoadWport(string path, byte[] bytes)
@@ -402,11 +464,23 @@ internal static class ImageFormats
 
     private static byte[] EncodeWportFrame(IndexedFrame frame)
     {
-        var output = new byte[288];
-        var ptr = 0;
-        for (var tileY = 0; tileY < 3; tileY++)
+        return EncodeTiledPlanar(frame);
+    }
+
+    private static byte[] EncodeTiledPlanar(IndexedFrame frame)
+    {
+        if (frame.Width <= 0 || frame.Height <= 0 || frame.Width % 8 != 0 || frame.Height % 8 != 0)
         {
-            for (var tileX = 0; tileX < 3; tileX++)
+            throw new InvalidDataException($"Invalid frame dimensions: {frame.Width}x{frame.Height}.");
+        }
+
+        var tileCount = checked((frame.Width / 8) * (frame.Height / 8));
+        var outputBytes = checked(tileCount * TileByteSize);
+        var output = new byte[outputBytes];
+        var ptr = 0;
+        for (var tileY = 0; tileY < frame.Height / 8; tileY++)
+        {
+            for (var tileX = 0; tileX < frame.Width / 8; tileX++)
             {
                 var tile = new byte[32];
                 for (var row = 0; row < 8; row++)
@@ -433,6 +507,99 @@ internal static class ImageFormats
         }
 
         return output;
+    }
+
+    private static byte[] EncodePicRle(byte[] decompressed)
+    {
+        const int chunkPayloadSize = 0x0FFF;
+        const int chunkSize = 0x1000;
+        var encoded = new List<byte>();
+        var chunk = new List<byte>(chunkPayloadSize);
+
+        void FlushChunk()
+        {
+            if (chunk.Count == 0)
+            {
+                return;
+            }
+
+            var block = new byte[chunkSize];
+            for (var i = 0; i < chunk.Count; i++)
+            {
+                block[i] = chunk[i];
+            }
+
+            encoded.AddRange(block);
+            chunk.Clear();
+        }
+
+        var offset = 0;
+        while (offset < decompressed.Length)
+        {
+            if (chunk.Count >= chunkPayloadSize - 1)
+            {
+                FlushChunk();
+            }
+
+            var spaceForLiteralBytes = Math.Min(127, chunkPayloadSize - chunk.Count - 1);
+            var literalLength = Math.Min(spaceForLiteralBytes, decompressed.Length - offset);
+            if (literalLength <= 0)
+            {
+                FlushChunk();
+                continue;
+            }
+
+            chunk.Add((byte)literalLength);
+            for (var i = 0; i < literalLength; i++)
+            {
+                chunk.Add(decompressed[offset + i]);
+            }
+
+            offset += literalLength;
+        }
+
+        if (chunk.Count >= chunkPayloadSize)
+        {
+            FlushChunk();
+        }
+
+        chunk.Add(0x00);
+        FlushChunk();
+        return encoded.ToArray();
+    }
+
+    private static void ValidatePicFrame(IndexedFrame frame, int index)
+    {
+        if (frame.Width <= 0 || frame.Height <= 0 || frame.Width % 8 != 0 || frame.Height % 8 != 0)
+        {
+            throw new InvalidDataException($"PIC frame {index} must have dimensions in 8x8 tile units.");
+        }
+
+        var widthTiles = frame.Width / 8;
+        var heightTiles = frame.Height / 8;
+        if (widthTiles > MaxPicWidthTiles || heightTiles > MaxPicHeightTiles)
+        {
+            throw new InvalidDataException($"PIC frame {index} exceeds maximum tile dimensions.");
+        }
+
+        var tileCount = checked(widthTiles * heightTiles);
+        if (tileCount > MaxPicMaskTiles)
+        {
+            throw new InvalidDataException(
+                $"PIC frame {index} uses {tileCount} tiles, exceeding the {MaxPicMaskTiles}-tile mask limit.");
+        }
+
+        var expectedPixelCount = checked(frame.Width * frame.Height);
+        if (frame.Pixels.Length != expectedPixelCount)
+        {
+            throw new InvalidDataException($"PIC frame {index} pixel data length does not match dimensions.");
+        }
+    }
+
+    private static void WriteUInt16(byte[] buffer, int offset, ushort value)
+    {
+        buffer[offset] = (byte)(value & 0xFF);
+        buffer[offset + 1] = (byte)(value >> 8);
     }
 
     private static int CountBits(byte value)
