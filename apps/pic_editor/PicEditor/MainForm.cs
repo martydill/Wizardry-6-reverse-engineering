@@ -570,8 +570,18 @@ internal sealed class MainForm : Form
             return;
         }
 
-        frame.Pixels[(py * frame.Width) + px] = (byte)_selectedColorIndex;
-        Redraw();
+        var pixelIndex = (py * frame.Width) + px;
+        var selectedColor = (byte)_selectedColorIndex;
+        if (frame.Pixels[pixelIndex] == selectedColor)
+        {
+            return;
+        }
+
+        frame.Pixels[pixelIndex] = selectedColor;
+        if (!TryUpdatePaintedPixel(frame, px, py, selectedColor))
+        {
+            Redraw();
+        }
     }
 
     private void PushUndo()
@@ -677,6 +687,51 @@ internal sealed class MainForm : Form
         _nativePreview.Width = native.Width;
         _nativePreview.Height = native.Height;
         _statusLabel.Text = $"{Path.GetFileName(_document.SourcePath)} | {_document.Kind.ToUpperInvariant()} | Frame {_currentFrameIndex + 1}/{_document.Frames.Count} | Zoom {_zoom}x";
+    }
+
+    private bool TryUpdatePaintedPixel(IndexedFrame frame, int px, int py, byte colorIndex)
+    {
+        if (_document == null || _canvas.Image is not Bitmap canvasBitmap || _nativePreview.Image is not Bitmap nativeBitmap)
+        {
+            return false;
+        }
+
+        if (canvasBitmap.Width != frame.Width * _zoom || canvasBitmap.Height != frame.Height * _zoom)
+        {
+            return false;
+        }
+
+        if (nativeBitmap.Width != frame.Width || nativeBitmap.Height != frame.Height)
+        {
+            return false;
+        }
+
+        var color = _document.Palette[colorIndex & 0x0F];
+        using (var g = Graphics.FromImage(canvasBitmap))
+        using (var brush = new SolidBrush(color))
+        {
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.FillRectangle(brush, px * _zoom, py * _zoom, _zoom, _zoom);
+
+            if (_showGridCheckBox.Checked)
+            {
+                using var pen = new Pen(Color.FromArgb(50, 50, 50));
+                var left = px * _zoom;
+                var top = py * _zoom;
+                var right = left + _zoom;
+                var bottom = top + _zoom;
+                g.DrawLine(pen, left, top, right, top);
+                g.DrawLine(pen, left, top, left, bottom);
+                g.DrawLine(pen, right, top, right, bottom);
+                g.DrawLine(pen, left, bottom, right, bottom);
+            }
+        }
+
+        nativeBitmap.SetPixel(px, py, color);
+        _canvas.Invalidate(new Rectangle(px * _zoom, py * _zoom, _zoom + 1, _zoom + 1));
+        _nativePreview.Invalidate(new Rectangle(px, py, 1, 1));
+        return true;
     }
 
     private Bitmap RenderFrameBitmap(IndexedFrame frame, int scale, bool drawGrid)
