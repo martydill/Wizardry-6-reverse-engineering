@@ -9,7 +9,7 @@ namespace PicEditor;
 
 internal sealed class MainForm : Form
 {
-    private readonly ListBox _frameList = new ListBox();
+    private readonly DomainUpDown _frameList = new DomainUpDown();
     private readonly FlowLayoutPanel _frameStrip = new FlowLayoutPanel();
     private readonly PictureBox _canvas = new PictureBox();
     private readonly PictureBox _nativePreview = new PictureBox();
@@ -51,7 +51,7 @@ internal sealed class MainForm : Form
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -75,12 +75,17 @@ internal sealed class MainForm : Form
         left.Controls.Add(zoomPanel, 0, 3);
 
         left.Controls.Add(new Label { Text = "Frames", Dock = DockStyle.Fill, TextAlign = ContentAlignment.BottomLeft }, 0, 5);
+        _frameList.Height = 44;
+        _frameList.ReadOnly = true;
+        _frameList.Wrap = false;
+        _frameList.TextAlign = HorizontalAlignment.Left;
         _frameList.Dock = DockStyle.Fill;
-        _frameList.SelectedIndexChanged += (_, __) =>
+        _frameList.SelectedItemChanged += (_, __) =>
         {
-            if (_frameList.SelectedIndex >= 0)
+            var selectedIndex = _frameList.Items.IndexOf(_frameList.SelectedItem);
+            if (selectedIndex >= 0)
             {
-                _currentFrameIndex = _frameList.SelectedIndex;
+                _currentFrameIndex = selectedIndex;
                 ReloadFrameStrip();
                 Redraw();
             }
@@ -317,7 +322,7 @@ internal sealed class MainForm : Form
 
         if (_frameList.Items.Count > 0)
         {
-            _frameList.SelectedIndex = _currentFrameIndex;
+            _frameList.SelectedItem = _frameList.Items[_currentFrameIndex];
         }
     }
 
@@ -382,7 +387,7 @@ internal sealed class MainForm : Form
             void SelectFrame(object? _, EventArgs __)
             {
                 _currentFrameIndex = frameIndex;
-                _frameList.SelectedIndex = frameIndex;
+                _frameList.SelectedItem = _frameList.Items[frameIndex];
                 ReloadFrameStrip();
                 Redraw();
             }
@@ -613,7 +618,7 @@ internal sealed class MainForm : Form
         }
 
         _currentFrameIndex = next;
-        _frameList.SelectedIndex = next;
+        _frameList.SelectedItem = _frameList.Items[next];
         ReloadFrameStrip();
         Redraw();
     }
