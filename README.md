@@ -14,7 +14,7 @@ This repo currently has two tools.
 [Pic Editor](apps/pic_editor/) - an editor for character portraits and monster graphics
 <img src="./media/apps-pic-editor.png">
 
-[Character Roster Editor](apps/character_roster_editor_editor/)  - an editor for character rosters (PCFILE.DBS)
+[Character Roster Editor](apps/character_roster_editor/)  - an editor for character rosters (PCFILE.DBS)
 <img src="./media/apps-character-roster-editor.png">
 
 ### Stuff that has been reverse engineered 
