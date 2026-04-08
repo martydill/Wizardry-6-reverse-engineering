@@ -22,7 +22,7 @@ internal sealed class MainForm : Form
 
     private SpriteDocument? _document;
     private int _currentFrameIndex;
-    private int _zoom = 16;
+    private int _zoom = 6;
     private int _selectedColorIndex = 1;
     private bool _dragging;
     private IndexedFrame? _copiedFrame;
@@ -65,7 +65,7 @@ internal sealed class MainForm : Form
         zoomPanel.Controls.Add(new Label { Text = "Zoom", Width = 60, TextAlign = ContentAlignment.MiddleLeft });
         _zoomNumeric.Minimum = 4;
         _zoomNumeric.Maximum = 32;
-        _zoomNumeric.Value = 16;
+        _zoomNumeric.Value = 6;
         _zoomNumeric.ValueChanged += (_, __) =>
         {
             _zoom = (int)_zoomNumeric.Value;
@@ -107,7 +107,7 @@ internal sealed class MainForm : Form
 
         var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 4, Padding = new Padding(8) };
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 106));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(right, 1, 0);
@@ -134,9 +134,12 @@ internal sealed class MainForm : Form
 
         _canvas.Dock = DockStyle.Fill;
         _canvas.SizeMode = PictureBoxSizeMode.Normal;
+        _canvas.TabStop = true;
         _canvas.MouseDown += CanvasOnMouseDown;
         _canvas.MouseMove += CanvasOnMouseMove;
         _canvas.MouseUp += (_, __) => _dragging = false;
+        _canvas.MouseEnter += (_, __) => _canvas.Focus();
+        _canvas.MouseWheel += CanvasOnMouseWheel;
         editorAndPreview.Panel1.AutoScroll = true;
         editorAndPreview.Panel1.Controls.Add(_canvas);
 
@@ -368,8 +371,8 @@ internal sealed class MainForm : Form
                 Height = 64,
                 Top = 2,
                 Left = 2,
-                SizeMode = PictureBoxSizeMode.CenterImage,
-                Image = RenderFrameBitmap(frame, 2, false),
+                SizeMode = PictureBoxSizeMode.Normal,
+                Image = RenderFrameThumbnail(frame, 80, 64),
                 Cursor = Cursors.Hand,
             };
             var label = new Label
@@ -527,6 +530,7 @@ internal sealed class MainForm : Form
             return;
         }
 
+        _canvas.Focus();
         _dragging = true;
         PushUndo();
         PaintAt(e.X, e.Y);
@@ -538,6 +542,16 @@ internal sealed class MainForm : Form
         {
             PaintAt(e.X, e.Y);
         }
+    }
+
+    private void CanvasOnMouseWheel(object? sender, MouseEventArgs e)
+    {
+        if (e.Delta == 0)
+        {
+            return;
+        }
+
+        SetZoom(_zoom + (e.Delta > 0 ? 1 : -1));
     }
 
     private void PaintAt(int x, int y)
@@ -623,6 +637,15 @@ internal sealed class MainForm : Form
         Redraw();
     }
 
+    private void SetZoom(int zoom)
+    {
+        var clampedZoom = Math.Max((int)_zoomNumeric.Minimum, Math.Min((int)_zoomNumeric.Maximum, zoom));
+        if (_zoomNumeric.Value != clampedZoom)
+        {
+            _zoomNumeric.Value = clampedZoom;
+        }
+    }
+
     private IndexedFrame? CurrentFrame()
     {
         if (_document == null || _currentFrameIndex < 0 || _currentFrameIndex >= _document.Frames.Count)
@@ -688,6 +711,25 @@ internal sealed class MainForm : Form
         }
 
         return bmp;
+    }
+
+    private Bitmap RenderFrameThumbnail(IndexedFrame frame, int maxWidth, int maxHeight)
+    {
+        var source = RenderFrameBitmap(frame, 1, false);
+        var thumbnail = new Bitmap(maxWidth, maxHeight);
+        using var g = Graphics.FromImage(thumbnail);
+        g.InterpolationMode = InterpolationMode.NearestNeighbor;
+        g.PixelOffsetMode = PixelOffsetMode.Half;
+        g.Clear(Color.Black);
+
+        var scale = Math.Min((float)maxWidth / source.Width, (float)maxHeight / source.Height);
+        var scaledWidth = Math.Max(1, (int)Math.Floor(source.Width * scale));
+        var scaledHeight = Math.Max(1, (int)Math.Floor(source.Height * scale));
+        var offsetX = (maxWidth - scaledWidth) / 2;
+        var offsetY = (maxHeight - scaledHeight) / 2;
+        g.DrawImage(source, new Rectangle(offsetX, offsetY, scaledWidth, scaledHeight));
+        source.Dispose();
+        return thumbnail;
     }
 
     private void ApplyStyle()
