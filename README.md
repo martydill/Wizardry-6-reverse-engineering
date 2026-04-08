@@ -8,8 +8,17 @@ Let's see if we can change that!
 ### File format docs
 Most up to date file format docs are stored in [file_format_docs](file_format_docs/)
 
-### Examples
-Here are some things that are kind of working. They assume that you have the original game data in a `gamedata/` folder.
+### Apps
+This repo currently has two tools.
+
+[Pic Editor](apps/pic_editor/) - an editor for character portraits and monster graphics
+<img src="./media/apps-pic-editor.png">
+
+[Character Roster Editor](apps/character_roster_editor_editor/)  - an editor for character rosters (PCFILE.DBS)
+<img src="./media/apps-character-roster-editor.png">
+
+### Stuff that has been reverse engineered 
+Here are some things that are kind of working or almost working. They assume that you have the original game data in a `gamedata/` folder.
 
 #### Monster graphics:
 `python -m loaders.pic_viewer .\gamedata\mon25.PIC`
