@@ -32,7 +32,7 @@ jobs:
       - name: Run PIC Editor tests
         run: dotnet test apps/pic_editor/PicEditor.Tests/PicEditor.Tests.csproj --configuration Release
 
-  publish:
+  build:
     needs: test
     runs-on: windows-latest
     strategy:
@@ -70,15 +70,45 @@ jobs:
           /p:FileVersion=${{ env.APP_VERSION }}
           /p:AssemblyVersion=${{ env.APP_VERSION }}.0
 
-      - name: Prepare artifact folder
+      - name: Zip ${{ matrix.app_name }}
         shell: pwsh
         run: |
-          $target = "artifacts/${{ matrix.app_name }}-$env:APP_VERSION"
-          New-Item -ItemType Directory -Force -Path $target | Out-Null
-          Copy-Item "${{ matrix.output_dir }}/*" -Destination $target -Recurse -Force
+          $zipName = "${{ matrix.app_name }}-$env:APP_VERSION.zip"
+          Compress-Archive -Path "${{ matrix.output_dir }}/*" -DestinationPath $zipName
+          "APP_ZIP=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Upload ${{ matrix.app_name }} artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app_name }}-${{ env.APP_VERSION }}
-          path: artifacts/${{ matrix.app_name }}-${{ env.APP_VERSION }}
+          path: ${{ env.APP_ZIP }}
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Compute version tag
+        shell: bash
+        run: |
+          echo "RELEASE_TAG=v${{ env.VERSION_PREFIX }}.${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ env.RELEASE_TAG }}
+          files: artifacts/*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
