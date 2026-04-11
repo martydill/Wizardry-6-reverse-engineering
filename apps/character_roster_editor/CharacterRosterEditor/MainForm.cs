@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -16,6 +17,7 @@ internal sealed class MainForm : Form
     private static readonly int[] VisibleSkillIndices = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 22, 23, 24, 25, 26, 27, 28, 29 };
 
     private readonly BindingList<CharacterRecord> _records = new BindingList<CharacterRecord>();
+    private readonly List<CharacterRecord> _allRecords = new List<CharacterRecord>();
 
     private readonly DataGridView _grid = new DataGridView();
     private readonly TextBox _nameTextBox = new TextBox();
@@ -43,13 +45,24 @@ internal sealed class MainForm : Form
     private readonly DataGridView _skillsGrid = new DataGridView();
     private readonly DataGridView _inventoryGrid = new DataGridView();
     private readonly TextBox _knownSpellsHexTextBox = new TextBox();
+    private readonly TextBox _searchTextBox = new TextBox();
+    private readonly ComboBox _raceFilterCombo = new ComboBox();
+    private readonly ComboBox _classFilterCombo = new ComboBox();
+    private readonly Label _derivedStatsLabel = new Label();
+    private readonly ListView _validationList = new ListView();
+    private readonly StatusStrip _statusStrip = new StatusStrip();
+    private readonly ToolStripStatusLabel _statusLabel = new ToolStripStatusLabel();
+    private readonly TabControl _editorTabs = new TabControl();
+    private readonly ToolStrip _toolStrip = new ToolStrip();
 
     private string? _currentPath;
     private PcfileDocument? _document;
     private bool _isUpdatingUi;
     private bool _hasUnsavedChanges;
-    private readonly System.Collections.Generic.Dictionary<string, Bitmap[]> _portraitFramesByFile =
-        new System.Collections.Generic.Dictionary<string, Bitmap[]>(StringComparer.OrdinalIgnoreCase);
+    private int _selectedSlotIndex = -1;
+    private bool _suppressSelectionPrompt;
+    private readonly Dictionary<string, Bitmap[]> _portraitFramesByFile =
+        new Dictionary<string, Bitmap[]>(StringComparer.OrdinalIgnoreCase);
 
     public MainForm()
     {
@@ -57,9 +70,11 @@ internal sealed class MainForm : Form
         Width = 1500;
         Height = 900;
         StartPosition = FormStartPosition.CenterScreen;
+        KeyPreview = true;
 
         BuildUi();
         ApplyStyle();
+        UpdateWindowTitle();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -72,48 +87,220 @@ internal sealed class MainForm : Form
         base.OnFormClosing(e);
     }
 
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.S))
+        {
+            SaveFile(false);
+            return true;
+        }
+
+        if (keyData == (Keys.Control | Keys.Shift | Keys.S))
+        {
+            SaveFile(true);
+            return true;
+        }
+
+        if (keyData == (Keys.Control | Keys.F))
+        {
+            _searchTextBox.Focus();
+            _searchTextBox.SelectAll();
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
     private void BuildUi()
     {
-        var root = new TableLayoutPanel
+        BuildMenu();
+        BuildToolStrip();
+        BuildStatusStrip();
+
+        var root = new SplitContainer
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 2,
-            Padding = new Padding(12),
+            Orientation = Orientation.Vertical,
+            SplitterDistance = 430,
+            Panel1MinSize = 320,
+            Panel2MinSize = 700,
+            Padding = new Padding(8),
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        root.Panel1.Controls.Add(BuildPartyPanel());
+
+        var splitEditorInspector = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterDistance = 760,
+            Panel1MinSize = 520,
+            Panel2MinSize = 220,
+        };
+
+        _editorTabs.Dock = DockStyle.Fill;
+        _editorTabs.TabPages.Add(new TabPage("Core") { Controls = { BuildCoreEditorPanel() } });
+        _editorTabs.TabPages.Add(new TabPage("Attributes") { Controls = { BuildAttributesPanel() } });
+        _editorTabs.TabPages.Add(new TabPage("Spell Points") { Controls = { BuildSpellPointsPanel() } });
+        _editorTabs.TabPages.Add(new TabPage("Skills") { Controls = { BuildSkillsPanel() } });
+        _editorTabs.TabPages.Add(new TabPage("Inventory") { Controls = { BuildInventoryPanel() } });
+        _editorTabs.TabPages.Add(new TabPage("Known Spells") { Controls = { BuildKnownSpellsPanel() } });
+
+        splitEditorInspector.Panel1.Controls.Add(_editorTabs);
+        splitEditorInspector.Panel2.Controls.Add(BuildInspectorPanel());
+
+        root.Panel2.Controls.Add(splitEditorInspector);
+
         Controls.Add(root);
+    }
 
-        var buttonPanel = new FlowLayoutPanel
+    private void BuildMenu()
+    {
+        var menu = new MenuStrip { Dock = DockStyle.Top };
+
+        var fileMenu = new ToolStripMenuItem("&File");
+        var openItem = new ToolStripMenuItem("Open...", null, (_, __) => OpenFile()) { ShortcutKeys = Keys.Control | Keys.O };
+        var saveItem = new ToolStripMenuItem("Save", null, (_, __) => SaveFile(false)) { ShortcutKeys = Keys.Control | Keys.S };
+        var saveAsItem = new ToolStripMenuItem("Save As...", null, (_, __) => SaveFile(true)) { ShortcutKeys = Keys.Control | Keys.Shift | Keys.S };
+        fileMenu.DropDownItems.Add(openItem);
+        fileMenu.DropDownItems.Add(saveItem);
+        fileMenu.DropDownItems.Add(saveAsItem);
+        fileMenu.DropDownItems.Add(new ToolStripSeparator());
+        fileMenu.DropDownItems.Add("Exit", null, (_, __) => Close());
+
+        var editMenu = new ToolStripMenuItem("&Edit");
+        editMenu.DropDownItems.Add("Delete Character", null, (_, __) => DeleteSelectedCharacter());
+
+        var toolsMenu = new ToolStripMenuItem("&Tools");
+        toolsMenu.DropDownItems.Add("Validate Selected", null, (_, __) => RefreshInspector(GetSelectedRecord()));
+
+        menu.Items.Add(fileMenu);
+        menu.Items.Add(editMenu);
+        menu.Items.Add(toolsMenu);
+
+        MainMenuStrip = menu;
+        Controls.Add(menu);
+    }
+
+    private void BuildToolStrip()
+    {
+        _toolStrip.Dock = DockStyle.Top;
+        _toolStrip.GripStyle = ToolStripGripStyle.Hidden;
+
+        _toolStrip.Items.Add(CreateToolButton("Open", (_, __) => OpenFile()));
+        _toolStrip.Items.Add(CreateToolButton("Save", (_, __) => SaveFile(false)));
+        _toolStrip.Items.Add(CreateToolButton("Save As", (_, __) => SaveFile(true)));
+        _toolStrip.Items.Add(new ToolStripSeparator());
+        _toolStrip.Items.Add(CreateToolButton("Delete", (_, __) => DeleteSelectedCharacter()));
+        _toolStrip.Items.Add(new ToolStripSeparator());
+        _toolStrip.Items.Add(new ToolStripLabel("Search"));
+
+        var searchHost = new ToolStripControlHost(new TextBox { Width = 180 });
+        if (searchHost.Control is TextBox textBox)
+        {
+            textBox.TextChanged += (_, __) =>
+            {
+                _searchTextBox.Text = textBox.Text;
+                ApplyRosterFilter();
+            };
+        }
+
+        _toolStrip.Items.Add(searchHost);
+        Controls.Add(_toolStrip);
+    }
+
+    private void BuildStatusStrip()
+    {
+        _statusStrip.Dock = DockStyle.Bottom;
+        _statusLabel.Text = "Ready";
+        _statusStrip.Items.Add(_statusLabel);
+        Controls.Add(_statusStrip);
+    }
+
+    private Control BuildPartyPanel()
+    {
+        var panel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Padding = new Padding(0, 4, 0, 0),
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(4),
         };
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        buttonPanel.Controls.Add(CreateButton("Open PCFILE.DBS", (_, __) => OpenFile()));
-        buttonPanel.Controls.Add(CreateButton("Save", (_, __) => SaveFile(false)));
-        buttonPanel.Controls.Add(CreateButton("Save As", (_, __) => SaveFile(true)));
-        buttonPanel.Controls.Add(CreateButton("Delete Character", (_, __) => DeleteSelectedCharacter()));
-
-        root.Controls.Add(buttonPanel, 0, 0);
-        root.SetColumnSpan(buttonPanel, 2);
+        panel.Controls.Add(BuildRosterFilterPanel(), 0, 0);
 
         BuildRosterGrid();
-        root.Controls.Add(_grid, 0, 1);
+        panel.Controls.Add(_grid, 0, 1);
 
-        var editorTabs = new TabControl { Dock = DockStyle.Fill };
-        editorTabs.TabPages.Add(new TabPage("Core") { Controls = { BuildCoreEditorPanel() } });
-        editorTabs.TabPages.Add(new TabPage("Spell Points") { Controls = { BuildSpellPointsPanel() } });
-        editorTabs.TabPages.Add(new TabPage("Skills") { Controls = { BuildSkillsPanel() } });
-        editorTabs.TabPages.Add(new TabPage("Inventory") { Controls = { BuildInventoryPanel() } });
-        editorTabs.TabPages.Add(new TabPage("Known Spells") { Controls = { BuildKnownSpellsPanel() } });
+        var commandRow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        commandRow.Controls.Add(CreateButton("Delete", (_, __) => DeleteSelectedCharacter()));
+        panel.Controls.Add(commandRow, 0, 2);
 
-        root.Controls.Add(editorTabs, 1, 1);
+        return panel;
+    }
+
+    private Control BuildRosterFilterPanel()
+    {
+        var panel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            WrapContents = false,
+            Padding = new Padding(0, 0, 0, 8),
+        };
+
+        _searchTextBox.Width = 180;
+        _searchTextBox.TextChanged += (_, __) => ApplyRosterFilter();
+
+        PopulateFilterCombo(_raceFilterCombo, "All Races", LookupTables.Races);
+        PopulateFilterCombo(_classFilterCombo, "All Classes", LookupTables.Classes);
+        _raceFilterCombo.SelectedIndexChanged += (_, __) => ApplyRosterFilter();
+        _classFilterCombo.SelectedIndexChanged += (_, __) => ApplyRosterFilter();
+
+        panel.Controls.Add(new Label { Text = "Find", AutoSize = true, Margin = new Padding(0, 7, 4, 0) });
+        panel.Controls.Add(_searchTextBox);
+        panel.Controls.Add(new Label { Text = "Race", AutoSize = true, Margin = new Padding(12, 7, 4, 0) });
+        panel.Controls.Add(_raceFilterCombo);
+        panel.Controls.Add(new Label { Text = "Class", AutoSize = true, Margin = new Padding(12, 7, 4, 0) });
+        panel.Controls.Add(_classFilterCombo);
+
+        return panel;
+    }
+
+    private Control BuildInspectorPanel()
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(8),
+        };
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var portrait = BuildPortraitPreviewPanel();
+        portrait.Dock = DockStyle.Top;
+
+        _derivedStatsLabel.Dock = DockStyle.Top;
+        _derivedStatsLabel.AutoSize = true;
+        _derivedStatsLabel.Text = "Derived stats will appear here.";
+
+        _validationList.Dock = DockStyle.Fill;
+        _validationList.View = View.Details;
+        _validationList.Columns.Add("Severity", 70);
+        _validationList.Columns.Add("Issue", 280);
+        _validationList.FullRowSelect = true;
+
+        panel.Controls.Add(portrait, 0, 0);
+        panel.Controls.Add(_derivedStatsLabel, 0, 1);
+        panel.Controls.Add(_validationList, 0, 2);
+
+        return panel;
     }
 
     private void BuildRosterGrid()
@@ -126,9 +313,10 @@ internal sealed class MainForm : Form
         _grid.AllowUserToDeleteRows = false;
         _grid.DataSource = _records;
         _grid.RowHeadersVisible = false;
-        _grid.SelectionChanged += (_, __) => LoadSelectionIntoEditor();
+        _grid.SelectionChanged += GridOnSelectionChanged;
         _grid.CellClick += (_, __) => LoadSelectionIntoEditor();
 
+        _grid.Columns.Clear();
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.SlotIndex), HeaderText = "Slot", Width = 50 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.Name), HeaderText = "Name", Width = 140 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.Level), HeaderText = "Level", Width = 60 });
@@ -138,6 +326,214 @@ internal sealed class MainForm : Form
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.HitPointsCurrent), HeaderText = "HP", Width = 60 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(CharacterRecord.StaminaCurrent), HeaderText = "STM", Width = 60 });
         _grid.CellFormatting += GridOnCellFormatting;
+    }
+
+    private Control BuildAttributesPanel()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16) };
+        BuildStatsEditor();
+        panel.Controls.Add(_statsPanel);
+        return panel;
+    }
+
+    private ToolStripButton CreateToolButton(string text, EventHandler onClick)
+    {
+        var button = new ToolStripButton(text)
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text,
+        };
+        button.Click += onClick;
+        return button;
+    }
+
+    private void PopulateFilterCombo(ComboBox combo, string allLabel, IReadOnlyDictionary<byte, string> values)
+    {
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.Width = 150;
+        combo.Items.Clear();
+        combo.Items.Add(allLabel);
+        foreach (var value in values.OrderBy(k => k.Key))
+        {
+            combo.Items.Add(new ComboItem(value.Key, value.Value));
+        }
+
+        combo.SelectedIndex = 0;
+    }
+
+    private void ApplyRosterFilter()
+    {
+        if (_document == null)
+        {
+            return;
+        }
+
+        var search = _searchTextBox.Text.Trim();
+        byte? raceFilter = _raceFilterCombo.SelectedItem is ComboItem race ? race.Key : null;
+        byte? classFilter = _classFilterCombo.SelectedItem is ComboItem klass ? klass.Key : null;
+
+        var currentSlot = GetSelectedRecord()?.SlotIndex;
+
+        _records.RaiseListChangedEvents = false;
+        _records.Clear();
+        foreach (var record in _allRecords)
+        {
+            if (!string.IsNullOrWhiteSpace(search) && record.Name.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+
+            if (raceFilter.HasValue && record.RaceId != raceFilter.Value)
+            {
+                continue;
+            }
+
+            if (classFilter.HasValue && record.ClassId != classFilter.Value)
+            {
+                continue;
+            }
+
+            _records.Add(record);
+        }
+
+        _records.RaiseListChangedEvents = true;
+        _records.ResetBindings();
+
+        if (_records.Count == 0)
+        {
+            _selectedSlotIndex = -1;
+            LoadSelectionIntoEditor();
+            return;
+        }
+
+        var rowToSelect = 0;
+        if (currentSlot.HasValue)
+        {
+            for (var i = 0; i < _records.Count; i++)
+            {
+                if (_records[i].SlotIndex == currentSlot.Value)
+                {
+                    rowToSelect = i;
+                    break;
+                }
+            }
+        }
+
+        _grid.ClearSelection();
+        _grid.Rows[rowToSelect].Selected = true;
+        _grid.CurrentCell = _grid.Rows[rowToSelect].Cells[0];
+        LoadSelectionIntoEditor();
+        UpdateStatus($"Showing {_records.Count} characters");
+    }
+
+    private bool ConfirmSelectionChange(int newSlotIndex)
+    {
+        if (_suppressSelectionPrompt || !_hasUnsavedChanges || _selectedSlotIndex < 0 || _selectedSlotIndex == newSlotIndex)
+        {
+            return true;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            "You have unsaved edits. Save before switching characters?",
+            "Unsaved changes",
+            MessageBoxButtons.YesNoCancel,
+            MessageBoxIcon.Warning);
+
+        if (result == DialogResult.Cancel)
+        {
+            return false;
+        }
+
+        if (result == DialogResult.Yes)
+        {
+            return SaveFile(false);
+        }
+
+        return true;
+    }
+
+    private void SelectSlot(int slotIndex)
+    {
+        for (var i = 0; i < _records.Count; i++)
+        {
+            if (_records[i].SlotIndex != slotIndex)
+            {
+                continue;
+            }
+
+            _suppressSelectionPrompt = true;
+            _grid.ClearSelection();
+            _grid.Rows[i].Selected = true;
+            _grid.CurrentCell = _grid.Rows[i].Cells[0];
+            _suppressSelectionPrompt = false;
+            return;
+        }
+    }
+
+    private void GridOnSelectionChanged(object? sender, EventArgs e)
+    {
+        var selected = GetSelectedRecord();
+        if (selected == null)
+        {
+            LoadSelectionIntoEditor();
+            return;
+        }
+
+        if (!ConfirmSelectionChange(selected.SlotIndex))
+        {
+            SelectSlot(_selectedSlotIndex);
+            return;
+        }
+
+        _selectedSlotIndex = selected.SlotIndex;
+        LoadSelectionIntoEditor();
+    }
+
+    private void RefreshInspector(CharacterRecord? selected)
+    {
+        _validationList.Items.Clear();
+        if (selected == null)
+        {
+            _derivedStatsLabel.Text = "No character selected.";
+            return;
+        }
+
+        _derivedStatsLabel.Text =
+            $"HP {selected.HitPointsCurrent}/{selected.HitPointsMax}\n" +
+            $"Stamina {selected.StaminaCurrent}/{selected.StaminaMax}\n" +
+            $"Load {selected.LoadCurrentTenths / 10.0:F1}/{selected.LoadMaxTenths / 10.0:F1}";
+
+        if (selected.HitPointsCurrent > selected.HitPointsMax)
+        {
+            _validationList.Items.Add(new ListViewItem(new[] { "Error", "HP Current exceeds HP Max" }));
+        }
+
+        if (selected.StaminaCurrent > selected.StaminaMax)
+        {
+            _validationList.Items.Add(new ListViewItem(new[] { "Error", "Stamina Current exceeds Stamina Max" }));
+        }
+
+        if (selected.LoadCurrentTenths > selected.LoadMaxTenths)
+        {
+            _validationList.Items.Add(new ListViewItem(new[] { "Warning", "Current load exceeds max load" }));
+        }
+
+        if (_validationList.Items.Count == 0)
+        {
+            _validationList.Items.Add(new ListViewItem(new[] { "Info", "No validation issues." }));
+        }
+    }
+
+    private void UpdateWindowTitle()
+    {
+        var fileName = string.IsNullOrWhiteSpace(_currentPath) ? "(no file)" : Path.GetFileName(_currentPath);
+        var dirtyMarker = _hasUnsavedChanges ? "*" : string.Empty;
+        Text = $"Wizardry 6 Character Roster Editor{dirtyMarker} - {fileName}";
+    }
+
+    private void UpdateStatus(string message)
+    {
+        _statusLabel.Text = message;
     }
 
     private Control BuildCoreEditorPanel()
@@ -150,8 +546,6 @@ internal sealed class MainForm : Form
         ConfigureNumeric(_ageNumeric, 0, uint.MaxValue / 365u);
         ConfigureNumeric(_levelNumeric, 0, ushort.MaxValue);
         ConfigureNumeric(_rankNumeric, 0, ushort.MaxValue);
-
-        BuildStatsEditor();
 
         var identityAndStats = BuildIdentityAndStatsSection();
         layout.Controls.Add(identityAndStats, 0, 0);
@@ -168,17 +562,6 @@ internal sealed class MainForm : Form
 
     private Control BuildIdentityAndStatsSection()
     {
-        var section = new TableLayoutPanel
-        {
-            Dock = DockStyle.Top,
-            ColumnCount = 2,
-            AutoSize = true,
-            Margin = new Padding(0, 0, 0, 8),
-        };
-        section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        section.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
         var identity = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Anchor = AnchorStyles.Top | AnchorStyles.Left };
         identity.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -197,13 +580,7 @@ internal sealed class MainForm : Form
         AddEditorRow(identity, 12, "Class", _classCombo);
         AddEditorRow(identity, 13, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
         AddEditorRow(identity, 14, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
-        AddEditorRow(identity, 15, "Portrait", BuildPortraitPreviewPanel());
-
-        _statsPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-
-        section.Controls.Add(identity, 0, 0);
-        section.Controls.Add(_statsPanel, 1, 0);
-        return section;
+        return identity;
     }
 
     private void BuildStatsEditor()
@@ -418,6 +795,7 @@ internal sealed class MainForm : Form
         }
 
         MarkDirty();
+        RefreshInspector(selected);
         _grid.Refresh();
     }
 
@@ -430,6 +808,7 @@ internal sealed class MainForm : Form
             _portraitInfoLabel.Text = "No portrait loaded.";
             _portraitPrevButton.Enabled = false;
             _portraitNextButton.Enabled = false;
+            RefreshInspector(null);
             return;
         }
 
@@ -461,8 +840,10 @@ internal sealed class MainForm : Form
         RefreshInventoryGrid(selected);
         _knownSpellsHexTextBox.Text = BitConverter.ToString(selected.KnownSpellsBitset).Replace("-", string.Empty);
         RefreshPortraitPreview(selected);
+        RefreshInspector(selected);
 
         _isUpdatingUi = false;
+        UpdateStatus($"Editing slot {selected.SlotIndex}: {selected.Name}");
     }
 
     private void RefreshPortraitPreview(CharacterRecord selected)
@@ -685,20 +1066,17 @@ internal sealed class MainForm : Form
                 _currentPath = dialog.FileName;
                 LoadPortraitFiles(Path.GetDirectoryName(dialog.FileName));
 
-                _records.Clear();
+                _allRecords.Clear();
                 foreach (var record in _document.Records)
                 {
-                    _records.Add(record);
+                    _allRecords.Add(record);
                 }
 
-                Text = $"Wizardry 6 Character Roster Editor - {Path.GetFileName(_currentPath)}";
                 _hasUnsavedChanges = false;
-                if (_records.Count > 0)
-                {
-                    _grid.Rows[0].Selected = true;
-                    _grid.CurrentCell = _grid.Rows[0].Cells[0];
-                    LoadSelectionIntoEditor();
-                }
+                _selectedSlotIndex = -1;
+                UpdateWindowTitle();
+                ApplyRosterFilter();
+                UpdateStatus($"Loaded {_allRecords.Count} roster slots from {Path.GetFileName(_currentPath)}");
             }
         }
     }
@@ -882,7 +1260,7 @@ internal sealed class MainForm : Form
         }
 
         _document.Records.Clear();
-        foreach (var record in _records)
+        foreach (var record in _allRecords)
         {
             _document.Records.Add(record);
         }
@@ -890,6 +1268,8 @@ internal sealed class MainForm : Form
         _document.Save(outputPath!);
         _currentPath = outputPath;
         _hasUnsavedChanges = false;
+        UpdateWindowTitle();
+        UpdateStatus($"Saved to {Path.GetFileName(_currentPath)}");
 
         MessageBox.Show(this, "Roster saved successfully.", "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
         return true;
@@ -931,6 +1311,8 @@ internal sealed class MainForm : Form
     private void MarkDirty()
     {
         _hasUnsavedChanges = true;
+        UpdateWindowTitle();
+        UpdateStatus("Unsaved changes");
     }
 
     private bool ConfirmCloseWithUnsavedChanges()
