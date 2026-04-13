@@ -472,6 +472,11 @@ internal sealed class MainForm : Form
 
     private void GridOnSelectionChanged(object? sender, EventArgs e)
     {
+        if (_document == null)
+        {
+            return;
+        }
+
         var selected = GetSelectedRecord();
         if (selected == null)
         {
@@ -751,6 +756,11 @@ internal sealed class MainForm : Form
             return;
         }
 
+        if (_document == null)
+        {
+            return;
+        }
+
         var selected = GetSelectedRecord();
         if (selected == null)
         {
@@ -791,6 +801,11 @@ internal sealed class MainForm : Form
 
         for (var i = 0; i < 8; i++)
         {
+            if (_statEditors[i] == null)
+            {
+                continue;
+            }
+
             selected.Stats[i] = (byte)_statEditors[i].Value;
         }
 
@@ -832,6 +847,11 @@ internal sealed class MainForm : Form
 
         for (var i = 0; i < 8; i++)
         {
+            if (_statEditors[i] == null)
+            {
+                continue;
+            }
+
             _statEditors[i].Value = selected.Stats[i];
         }
 

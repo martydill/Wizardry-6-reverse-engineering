@@ -10,6 +10,18 @@ internal static class Program
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Application.Run(new MainForm());
+
+        try
+        {
+            Application.Run(new MainForm());
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.ToString(),
+                "Character Roster Editor startup error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
     }
 }
