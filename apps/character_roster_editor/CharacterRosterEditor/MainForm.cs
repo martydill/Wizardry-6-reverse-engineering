@@ -54,6 +54,8 @@ internal sealed class MainForm : Form
     private readonly ToolStripStatusLabel _statusLabel = new ToolStripStatusLabel();
     private readonly TabControl _editorTabs = new TabControl();
     private readonly ToolStrip _toolStrip = new ToolStrip();
+    private readonly SplitContainer _splitMain = new SplitContainer();
+    private readonly SplitContainer _splitEditorInspector = new SplitContainer();
 
     private string? _currentPath;
     private PcfileDocument? _document;
@@ -88,6 +90,32 @@ internal sealed class MainForm : Form
     }
 
 
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        ConfigureInitialSplitters();
+    }
+
+    private void ConfigureInitialSplitters()
+    {
+        ConfigureSplitterDistance(_splitMain, (int)(_splitMain.ClientSize.Width * 0.30));
+        ConfigureSplitterDistance(_splitEditorInspector, (int)(_splitEditorInspector.ClientSize.Width * 0.75));
+    }
+
+    private static void ConfigureSplitterDistance(SplitContainer split, int target)
+    {
+        var max = split.ClientSize.Width - split.Panel2MinSize;
+        var min = split.Panel1MinSize;
+        if (max <= min)
+        {
+            split.SplitterDistance = Math.Max(1, Math.Min(min, split.ClientSize.Width - 1));
+            return;
+        }
+
+        split.SplitterDistance = Math.Max(min, Math.Min(target, max));
+    }
+
+
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (keyData == (Keys.Control | Keys.S))
@@ -117,26 +145,18 @@ internal sealed class MainForm : Form
         BuildToolStrip();
         BuildStatusStrip();
 
-        var root = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            Orientation = Orientation.Vertical,
-            SplitterDistance = 430,
-            Panel1MinSize = 320,
-            Panel2MinSize = 700,
-            Padding = new Padding(8),
-        };
+        _splitMain.Dock = DockStyle.Fill;
+        _splitMain.Orientation = Orientation.Vertical;
+        _splitMain.Panel1MinSize = 220;
+        _splitMain.Panel2MinSize = 320;
+        _splitMain.Padding = new Padding(8);
 
-        root.Panel1.Controls.Add(BuildPartyPanel());
+        _splitMain.Panel1.Controls.Add(BuildPartyPanel());
 
-        var splitEditorInspector = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            Orientation = Orientation.Vertical,
-            SplitterDistance = 760,
-            Panel1MinSize = 520,
-            Panel2MinSize = 220,
-        };
+        _splitEditorInspector.Dock = DockStyle.Fill;
+        _splitEditorInspector.Orientation = Orientation.Vertical;
+        _splitEditorInspector.Panel1MinSize = 360;
+        _splitEditorInspector.Panel2MinSize = 200;
 
         _editorTabs.Dock = DockStyle.Fill;
         _editorTabs.TabPages.Add(new TabPage("Core") { Controls = { BuildCoreEditorPanel() } });
@@ -146,12 +166,12 @@ internal sealed class MainForm : Form
         _editorTabs.TabPages.Add(new TabPage("Inventory") { Controls = { BuildInventoryPanel() } });
         _editorTabs.TabPages.Add(new TabPage("Known Spells") { Controls = { BuildKnownSpellsPanel() } });
 
-        splitEditorInspector.Panel1.Controls.Add(_editorTabs);
-        splitEditorInspector.Panel2.Controls.Add(BuildInspectorPanel());
+        _splitEditorInspector.Panel1.Controls.Add(_editorTabs);
+        _splitEditorInspector.Panel2.Controls.Add(BuildInspectorPanel());
 
-        root.Panel2.Controls.Add(splitEditorInspector);
+        _splitMain.Panel2.Controls.Add(_splitEditorInspector);
 
-        Controls.Add(root);
+        Controls.Add(_splitMain);
     }
 
     private void BuildMenu()
