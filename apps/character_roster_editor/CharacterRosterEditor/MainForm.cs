@@ -98,21 +98,32 @@ internal sealed class MainForm : Form
 
     private void ConfigureInitialSplitters()
     {
-        ConfigureSplitterDistance(_splitMain, (int)(_splitMain.ClientSize.Width * 0.30));
-        ConfigureSplitterDistance(_splitEditorInspector, (int)(_splitEditorInspector.ClientSize.Width * 0.75));
+        ConfigureSplitter(_splitMain, 0.30, 220, 320);
+        ConfigureSplitter(_splitEditorInspector, 0.75, 360, 200);
     }
 
-    private static void ConfigureSplitterDistance(SplitContainer split, int target)
+    private static void ConfigureSplitter(SplitContainer split, double ratio, int desiredMin1, int desiredMin2)
     {
-        var max = split.ClientSize.Width - split.Panel2MinSize;
-        var min = split.Panel1MinSize;
-        if (max <= min)
+        var width = Math.Max(2, split.ClientSize.Width);
+        var min1 = Math.Min(desiredMin1, width - 1);
+        var min2 = Math.Min(desiredMin2, width - min1 - 1);
+        if (min2 < 0)
         {
-            split.SplitterDistance = Math.Max(1, Math.Min(min, split.ClientSize.Width - 1));
-            return;
+            min2 = 0;
         }
 
-        split.SplitterDistance = Math.Max(min, Math.Min(target, max));
+        split.Panel1MinSize = 0;
+        split.Panel2MinSize = 0;
+
+        var target = (int)(width * ratio);
+        var max = Math.Max(1, width - min2);
+        split.SplitterDistance = Math.Max(min1, Math.Min(target, max));
+
+        split.Panel1MinSize = min1;
+        split.Panel2MinSize = min2;
+
+        var boundedMax = Math.Max(min1, width - min2);
+        split.SplitterDistance = Math.Max(min1, Math.Min(split.SplitterDistance, boundedMax));
     }
 
 
@@ -147,16 +158,12 @@ internal sealed class MainForm : Form
 
         _splitMain.Dock = DockStyle.Fill;
         _splitMain.Orientation = Orientation.Vertical;
-        _splitMain.Panel1MinSize = 220;
-        _splitMain.Panel2MinSize = 320;
         _splitMain.Padding = new Padding(8);
 
         _splitMain.Panel1.Controls.Add(BuildPartyPanel());
 
         _splitEditorInspector.Dock = DockStyle.Fill;
         _splitEditorInspector.Orientation = Orientation.Vertical;
-        _splitEditorInspector.Panel1MinSize = 360;
-        _splitEditorInspector.Panel2MinSize = 200;
 
         _editorTabs.Dock = DockStyle.Fill;
         _editorTabs.TabPages.Add(new TabPage("Core") { Controls = { BuildCoreEditorPanel() } });
