@@ -96,8 +96,8 @@ CLASS_NAMES = (
 # Default race names (label only; extraction never depends on them)
 RACE_NAMES = (
     "Human", "Elf", "Dwarf", "Gnome", "Hobbit",
-    "Faerie", "Pixie", "Draken", "Lizardman", "Felpurr",
-    "Rawulf", "Mook", "Trang", "Drakon",
+    "Faerie", "Lizardman", "Dracon", "Felpurr",
+    "Rawulf", "Mook", "unused_race_11", "unused_race_12", "unused_race_13",
 )
 
 # Bits 7, 6, 5 of Field 4 (MSB-first) → Good, Neutral, Evil
@@ -715,7 +715,7 @@ def demo(creator: CharacterCreator) -> None:
         ("Borin",   2, 3, Gender.MALE,   Alignment.NEUTRAL), # Dwarf   Thief
         ("Nim",     4, 3, Gender.FEMALE, Alignment.GOOD),    # Hobbit  Thief
         ("Zyx",     9, 4, Gender.MALE,   Alignment.NEUTRAL), # Felpurr Bishop
-        ("Kragg",   7, 0, Gender.MALE,   Alignment.EVIL),    # Draken  Fighter
+        ("Kragg",   7, 0, Gender.MALE,   Alignment.EVIL),    # Dracon  Fighter
     ]
 
     for name, ri, ci, gender, alignment in party_spec:
