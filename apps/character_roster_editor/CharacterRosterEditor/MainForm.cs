@@ -42,10 +42,13 @@ internal sealed class MainForm : Form
     private readonly DataGridView _spellPointsGrid = new DataGridView();
     private readonly DataGridView _skillsGrid = new DataGridView();
     private readonly DataGridView _inventoryGrid = new DataGridView();
+    private readonly Label _scenarioStatusLabel = new Label();
     private readonly TextBox _knownSpellsHexTextBox = new TextBox();
 
     private string? _currentPath;
+    private string? _scenarioPath;
     private PcfileDocument? _document;
+    private ScenarioDatabase? _scenarioDatabase;
     private bool _isUpdatingUi;
     private bool _hasUnsavedChanges;
     private readonly System.Collections.Generic.Dictionary<string, Bitmap[]> _portraitFramesByFile =
@@ -96,6 +99,7 @@ internal sealed class MainForm : Form
         };
 
         buttonPanel.Controls.Add(CreateButton("Open PCFILE.DBS", (_, __) => OpenFile()));
+        buttonPanel.Controls.Add(CreateButton("Open SCENARIO.DBS", (_, __) => OpenScenarioFile()));
         buttonPanel.Controls.Add(CreateButton("Save", (_, __) => SaveFile(false)));
         buttonPanel.Controls.Add(CreateButton("Save As", (_, __) => SaveFile(true)));
         buttonPanel.Controls.Add(CreateButton("Delete Character", (_, __) => DeleteSelectedCharacter()));
@@ -276,6 +280,14 @@ internal sealed class MainForm : Form
         ConfigureTableGrid(_inventoryGrid);
         _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Slot", ReadOnly = true, Width = 50 });
         _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "ItemId", Width = 80 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Name", ReadOnly = true, Width = 160 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Price", ReadOnly = true, Width = 80 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Damage", ReadOnly = true, Width = 80 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "ToHit", ReadOnly = true, Width = 60 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "AC", ReadOnly = true, Width = 50 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Wt", ReadOnly = true, Width = 50 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Skill", ReadOnly = true, Width = 60 });
+        _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Equip", ReadOnly = true, Width = 60 });
         _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Load(x10)", Width = 80 });
         _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B4", Width = 60 });
         _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B5", Width = 60 });
@@ -283,8 +295,17 @@ internal sealed class MainForm : Form
         _inventoryGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "B7", Width = 60 });
         _inventoryGrid.CellEndEdit += (_, __) => ApplyInventoryGrid();
 
-        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
-        panel.Controls.Add(_inventoryGrid);
+        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), RowCount = 2, ColumnCount = 1 };
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        _scenarioStatusLabel.Dock = DockStyle.Fill;
+        _scenarioStatusLabel.Height = 24;
+        _scenarioStatusLabel.Text = "No scenario.dbs loaded.";
+
+        panel.Controls.Add(_scenarioStatusLabel, 0, 0);
+        panel.Controls.Add(_inventoryGrid, 0, 1);
         return panel;
     }
 
@@ -533,7 +554,48 @@ internal sealed class MainForm : Form
         for (var i = 0; i < selected.Inventory.Length; i++)
         {
             var entry = selected.Inventory[i];
-            _inventoryGrid.Rows.Add(i, entry.ItemId, entry.LoadTenths, entry.Byte4, entry.Byte5, entry.Byte6, entry.Byte7);
+            _inventoryGrid.Rows.Add(i, entry.ItemId, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, entry.LoadTenths, entry.Byte4, entry.Byte5, entry.Byte6, entry.Byte7);
+            RefreshInventoryMetadataCells(_inventoryGrid.Rows[_inventoryGrid.Rows.Count - 1]);
+        }
+    }
+
+    private void RefreshInventoryMetadataCells(DataGridViewRow row)
+    {
+        var itemId = ParseUShortCell(row.Cells[1].Value);
+        if (itemId == 0)
+        {
+            ClearInventoryMetadataCells(row);
+            return;
+        }
+
+        if (_scenarioDatabase == null || !_scenarioDatabase.TryGetItem(itemId, out var item))
+        {
+            row.Cells[2].Value = _scenarioDatabase == null ? string.Empty : "(unknown)";
+            row.Cells[3].Value = string.Empty;
+            row.Cells[4].Value = string.Empty;
+            row.Cells[5].Value = string.Empty;
+            row.Cells[6].Value = string.Empty;
+            row.Cells[7].Value = string.Empty;
+            row.Cells[8].Value = string.Empty;
+            row.Cells[9].Value = string.Empty;
+            return;
+        }
+
+        row.Cells[2].Value = item.Name;
+        row.Cells[3].Value = item.Price;
+        row.Cells[4].Value = item.DamageRange;
+        row.Cells[5].Value = item.ToHitBonus;
+        row.Cells[6].Value = item.AcBonus;
+        row.Cells[7].Value = item.WeightTenths;
+        row.Cells[8].Value = item.WeaponSkill;
+        row.Cells[9].Value = item.EquipSlot;
+    }
+
+    private static void ClearInventoryMetadataCells(DataGridViewRow row)
+    {
+        for (var cellIndex = 2; cellIndex <= 9; cellIndex++)
+        {
+            row.Cells[cellIndex].Value = string.Empty;
         }
     }
 
@@ -614,11 +676,12 @@ internal sealed class MainForm : Form
             var row = _inventoryGrid.Rows[i];
             var entry = selected.Inventory[i];
             entry.ItemId = ParseUShortCell(row.Cells[1].Value);
-            entry.LoadTenths = ParseUShortCell(row.Cells[2].Value);
-            entry.Byte4 = ParseByteCell(row.Cells[3].Value);
-            entry.Byte5 = ParseByteCell(row.Cells[4].Value);
-            entry.Byte6 = ParseByteCell(row.Cells[5].Value);
-            entry.Byte7 = ParseByteCell(row.Cells[6].Value);
+            entry.LoadTenths = ParseUShortCell(row.Cells[10].Value);
+            entry.Byte4 = ParseByteCell(row.Cells[11].Value);
+            entry.Byte5 = ParseByteCell(row.Cells[12].Value);
+            entry.Byte6 = ParseByteCell(row.Cells[13].Value);
+            entry.Byte7 = ParseByteCell(row.Cells[14].Value);
+            RefreshInventoryMetadataCells(row);
         }
 
         MarkDirty();
@@ -684,6 +747,7 @@ internal sealed class MainForm : Form
                 _document = PcfileDocument.Load(dialog.FileName);
                 _currentPath = dialog.FileName;
                 LoadPortraitFiles(Path.GetDirectoryName(dialog.FileName));
+                TryLoadScenarioFromRosterDirectory(Path.GetDirectoryName(dialog.FileName));
 
                 _records.Clear();
                 foreach (var record in _document.Records)
@@ -700,6 +764,94 @@ internal sealed class MainForm : Form
                     LoadSelectionIntoEditor();
                 }
             }
+        }
+    }
+
+    private void OpenScenarioFile()
+    {
+        using (var dialog = new OpenFileDialog())
+        {
+            dialog.Filter = "Wizardry scenario.dbs (*.dbs)|*.dbs|All files (*.*)|*.*";
+            dialog.Title = "Open SCENARIO.DBS";
+            dialog.FileName = "SCENARIO.DBS";
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            LoadScenarioFile(dialog.FileName, showErrors: true);
+        }
+    }
+
+    private void TryLoadScenarioFromRosterDirectory(string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        foreach (var candidate in CandidateScenarioPaths(directory!))
+        {
+            if (File.Exists(candidate) && LoadScenarioFile(candidate, showErrors: false))
+            {
+                return;
+            }
+        }
+    }
+
+    private bool LoadScenarioFile(string path, bool showErrors)
+    {
+        try
+        {
+            _scenarioDatabase = ScenarioDatabase.Load(path);
+            _scenarioPath = path;
+            _scenarioStatusLabel.Text = $"Loaded {Path.GetFileName(path)} ({_scenarioDatabase.ItemsById.Count} items).";
+
+            var selected = GetSelectedRecord();
+            if (selected != null)
+            {
+                RefreshInventoryGrid(selected);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
+        {
+            if (showErrors)
+            {
+                MessageBox.Show(this, $"Could not load scenario.dbs metadata: {ex.Message}", "Scenario load failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            if (string.Equals(_scenarioPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                _scenarioDatabase = null;
+                _scenarioPath = null;
+                _scenarioStatusLabel.Text = "No scenario.dbs loaded.";
+            }
+
+            return false;
+        }
+    }
+
+    private static System.Collections.Generic.IEnumerable<string> CandidateScenarioPaths(string baseDirectory)
+    {
+        foreach (var candidateDir in CandidateScenarioDirectories(baseDirectory))
+        {
+            yield return Path.Combine(candidateDir, "SCENARIO.DBS");
+            yield return Path.Combine(candidateDir, "scenario.dbs");
+        }
+    }
+
+    private static System.Collections.Generic.IEnumerable<string> CandidateScenarioDirectories(string baseDirectory)
+    {
+        yield return baseDirectory;
+        yield return Path.Combine(baseDirectory, "gamedata");
+
+        if (Directory.GetParent(baseDirectory)?.FullName is string parent && !string.IsNullOrWhiteSpace(parent))
+        {
+            yield return parent;
+            yield return Path.Combine(parent, "gamedata");
         }
     }
 
