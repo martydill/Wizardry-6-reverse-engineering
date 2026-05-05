@@ -200,12 +200,25 @@ internal sealed class MainForm : Form
         AddEditorRow(identity, 12, "Class", _classCombo);
         AddEditorRow(identity, 13, "Inv Page1 Cnt", ConfigureNumeric(_inventoryPage1Numeric, 0, 255));
         AddEditorRow(identity, 14, "Inv Page2 Cnt", ConfigureNumeric(_inventoryPage2Numeric, 0, 255));
-        AddEditorRow(identity, 15, "Portrait", BuildPortraitPreviewPanel());
 
-        _statsPanel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        var rightColumn = new TableLayoutPanel
+        {
+            AutoSize = true,
+            ColumnCount = 1,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left,
+        };
+        rightColumn.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        rightColumn.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _statsPanel.Dock = DockStyle.Top;
+        rightColumn.Controls.Add(_statsPanel, 0, 0);
+
+        var portraitPanel = BuildPortraitPreviewPanel();
+        portraitPanel.Dock = DockStyle.Top;
+        rightColumn.Controls.Add(portraitPanel, 0, 1);
 
         section.Controls.Add(identity, 0, 0);
-        section.Controls.Add(_statsPanel, 1, 0);
+        section.Controls.Add(rightColumn, 1, 0);
         return section;
     }
 
