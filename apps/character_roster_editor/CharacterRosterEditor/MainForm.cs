@@ -1199,7 +1199,7 @@ internal sealed class MainForm : Form
     private void PopulateCombo(ComboBox combo, System.Collections.Generic.IReadOnlyDictionary<byte, string> values)
     {
         combo.DropDownStyle = ComboBoxStyle.DropDownList;
-        combo.Width = 220;
+        combo.Width = 180;
         combo.Items.Clear();
 
         foreach (var kvp in values.OrderBy(k => k.Key))
