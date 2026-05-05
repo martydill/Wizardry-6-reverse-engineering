@@ -374,9 +374,6 @@ internal sealed class MainForm : Form
         _portraitPictureBox.SizeMode = PictureBoxSizeMode.Zoom;
         _portraitPictureBox.BorderStyle = BorderStyle.FixedSingle;
 
-        _portraitInfoLabel.AutoSize = true;
-        _portraitInfoLabel.Text = "No portrait loaded.";
-
         _portraitPrevButton.Text = "<";
         _portraitPrevButton.AutoSize = true;
         _portraitPrevButton.Click += (_, __) => CyclePortraitIndex(-1);
@@ -396,7 +393,6 @@ internal sealed class MainForm : Form
 
         panel.Controls.Add(_portraitPictureBox);
         panel.Controls.Add(navPanel);
-        panel.Controls.Add(_portraitInfoLabel);
         return panel;
     }
 
