@@ -534,7 +534,7 @@ internal sealed class MainForm : Form
             return;
         }
 
-        const int portraitCount = 28;
+        const int portraitCount = 42;
         var nextIndex = (selected.PortraitIndex + delta + portraitCount) % portraitCount;
         selected.PortraitIndex = (byte)nextIndex;
         MarkDirty();
@@ -878,6 +878,7 @@ internal sealed class MainForm : Form
         var resolvedDirectory = directory!;
         LoadPortraitFile(resolvedDirectory, "WPORT1.EGA");
         LoadPortraitFile(resolvedDirectory, "WPORT2.EGA");
+        LoadPortraitFile(resolvedDirectory, "WPORT3.EGA");
     }
 
     private void LoadPortraitFile(string directory, string fileName)
@@ -993,27 +994,59 @@ internal sealed class MainForm : Form
 
     private static (string FileName, int FrameIndex, string Source)? ResolvePortraitReference(byte portraitIndex, byte raw1A9, byte raw1AA)
     {
-        if (portraitIndex < 28)
+        if (portraitIndex < 42)
         {
-            return (portraitIndex < 14 ? "WPORT1.EGA" : "WPORT2.EGA", portraitIndex % 14, "0x19C portrait index");
+            var fileIndex = portraitIndex / 14;
+            var frameIndex = portraitIndex % 14;
+            var fileName = fileIndex switch
+            {
+                0 => "WPORT1.EGA",
+                1 => "WPORT2.EGA",
+                2 => "WPORT3.EGA",
+                _ => "WPORT1.EGA"
+            };
+            return (fileName, frameIndex, "0x19C portrait index");
         }
 
-        if (raw1A9 <= 1)
+        if (raw1A9 <= 2)
         {
             if (raw1AA < 14)
             {
-                return (raw1A9 == 0 ? "WPORT1.EGA" : "WPORT2.EGA", raw1AA, "0x1A9+0x1AA (0-based)");
+                var fileName = raw1A9 switch
+                {
+                    0 => "WPORT1.EGA",
+                    1 => "WPORT2.EGA",
+                    2 => "WPORT3.EGA",
+                    _ => "WPORT1.EGA"
+                };
+                return (fileName, raw1AA, "0x1A9+0x1AA (0-based)");
             }
 
             if (raw1AA is >= 1 and <= 14)
             {
-                return (raw1A9 == 0 ? "WPORT1.EGA" : "WPORT2.EGA", raw1AA - 1, "0x1A9+0x1AA (1-based)");
+                var fileName = raw1A9 switch
+                {
+                    0 => "WPORT1.EGA",
+                    1 => "WPORT2.EGA",
+                    2 => "WPORT3.EGA",
+                    _ => "WPORT1.EGA"
+                };
+                return (fileName, raw1AA - 1, "0x1A9+0x1AA (1-based)");
             }
         }
 
-        if (raw1A9 < 28)
+        if (raw1A9 < 42)
         {
-            return (raw1A9 < 14 ? "WPORT1.EGA" : "WPORT2.EGA", raw1A9 % 14, "0x1A9 absolute");
+            var fileIndex = raw1A9 / 14;
+            var frameIndex = raw1A9 % 14;
+            var fileName = fileIndex switch
+            {
+                0 => "WPORT1.EGA",
+                1 => "WPORT2.EGA",
+                2 => "WPORT3.EGA",
+                _ => "WPORT1.EGA"
+            };
+            return (fileName, frameIndex, "0x1A9 absolute");
         }
 
         return null;
