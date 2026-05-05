@@ -99,7 +99,6 @@ internal sealed class MainForm : Form
         };
 
         buttonPanel.Controls.Add(CreateButton("Open PCFILE.DBS", (_, __) => OpenFile()));
-        buttonPanel.Controls.Add(CreateButton("Open SCENARIO.DBS", (_, __) => OpenScenarioFile()));
         buttonPanel.Controls.Add(CreateButton("Save", (_, __) => SaveFile(false)));
         buttonPanel.Controls.Add(CreateButton("Save As", (_, __) => SaveFile(true)));
         buttonPanel.Controls.Add(CreateButton("Delete Character", (_, __) => DeleteSelectedCharacter()));
