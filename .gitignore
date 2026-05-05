@@ -32,3 +32,11 @@ output/
 *.swo
 *.png
 .claude/
+apps/character_roster_editor/CharacterRosterEditor/bin/**/*
+apps/character_roster_editor/CharacterRosterEditor.Tests/bin/**/*
+apps/character_roster_editor/CharacterRosterEditor.Tests/obj/**/*
+apps/character_roster_editor/CharacterRosterEditor/obj/**/*
+apps/pic_editor/PicEditor/bin/**/*
+apps/pic_editor/PicEditor/obj/**/*
+apps/pic_editor/PicEditor.Tests/bin/**/*
+apps/pic_editor/PicEditor.Tests/obj/**/*
